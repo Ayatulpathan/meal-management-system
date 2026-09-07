@@ -31,13 +31,13 @@ export const MonthProvider = ({ children }) => {
 
   const currentMonthData = useMemo(() => {
     const found = monthsList.find(m => m.month === selectedMonth || m.id === selectedMonth);
-    if (found) return found;
+    if (found) return { ...found, days: 31 };
 
     return {
       id: selectedMonth,
       month: selectedMonth,
       monthName: formatMonthName(selectedMonth),
-      days: getDaysInMonth(selectedMonth),
+      days: 31,
       status: 'open',
     };
   }, [monthsList, selectedMonth]);

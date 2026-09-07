@@ -80,7 +80,7 @@ export const useMeals = (customMonthId = null) => {
   }, [activeMonthId, isClosed]);
 
   // Derived daily totals
-  const totalDays = currentMonthData?.days || 30;
+  const totalDays = 31;
   const dailyTotals = calculateDailyMealTotals(mealRecords, totalDays);
   const totalMealsCount = calculateTotalMeals(mealRecords);
 

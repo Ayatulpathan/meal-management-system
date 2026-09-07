@@ -44,25 +44,21 @@ export const formatMonthName = (monthId) => {
 };
 
 /**
- * Returns the exact number of days in a given monthId (e.g. 28, 29, 30, 31)
+ * Returns 31 days for meal management grid accounting
  * @param {string} monthId 
  * @returns {number}
  */
 export const getDaysInMonth = (monthId) => {
-  if (!monthId || !monthId.includes('-')) return 30;
-  const [year, month] = monthId.split('-').map(Number);
-  // Passing 0 as day gets the last day of the given month
-  return new Date(year, month, 0).getDate();
+  return 31;
 };
 
 /**
- * Generates an array of day numbers [1, 2, ..., daysInMonth]
+ * Generates an array of 31 day numbers [1, 2, ..., 31]
  * @param {string} monthId 
  * @returns {number[]}
  */
 export const getDayList = (monthId) => {
-  const count = getDaysInMonth(monthId);
-  return Array.from({ length: count }, (_, i) => i + 1);
+  return Array.from({ length: 31 }, (_, i) => i + 1);
 };
 
 /**

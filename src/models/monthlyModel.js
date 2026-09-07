@@ -30,7 +30,7 @@ export const sanitizeMonth = (monthId, data = {}) => {
     id: monthId,
     month: monthId,
     monthName: data.monthName || formatMonthName(monthId),
-    days: data.days || getDaysInMonth(monthId),
+    days: 31,
     status: data.status || 'open',
     createdAt: data.createdAt || null,
     updatedAt: data.updatedAt || null,

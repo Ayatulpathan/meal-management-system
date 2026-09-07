@@ -45,7 +45,14 @@ export const AppRoutes = () => {
         <Route path="market-costs" element={<MarketCosts />} />
         <Route path="deposits" element={<Deposits />} />
         <Route path="reports" element={<Reports />} />
-        <Route path="settings" element={<Settings />} />
+        <Route
+          path="settings"
+          element={
+            <ProtectedRoute requireAdmin>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* Fallback Catch-all Route */}

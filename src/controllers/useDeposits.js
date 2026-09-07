@@ -7,7 +7,7 @@ import { calculateTotalDeposits, calculateMemberTotalDeposit } from '../utils/ca
 
 export const useDeposits = (customMonthId = null) => {
   const { selectedMonth, isClosed } = useMonthContext();
-  const { user } = useAuthContext();
+  const { user, isAdmin, currentMemberId } = useAuthContext();
   const activeMonthId = customMonthId || selectedMonth;
 
   const [deposits, setDeposits] = useState([]);
@@ -32,7 +32,11 @@ export const useDeposits = (customMonthId = null) => {
       return { success: false, error: 'This month is closed. Data cannot be modified.' };
     }
 
-    const validation = validateDeposit(depositData);
+    // Member can only record deposit for themselves; Admin can record for anyone
+    const targetMemberId = isAdmin ? (depositData.memberId || currentMemberId) : currentMemberId;
+    const sanitizedData = { ...depositData, memberId: targetMemberId };
+
+    const validation = validateDeposit(sanitizedData);
     if (!validation.isValid) {
       const firstError = Object.values(validation.errors)[0];
       return { success: false, error: firstError, errors: validation.errors };
@@ -41,7 +45,7 @@ export const useDeposits = (customMonthId = null) => {
     setActionLoading(true);
     setError(null);
     try {
-      const created = await depositService.addDeposit(activeMonthId, depositData, user?.uid || 'admin');
+      const created = await depositService.addDeposit(activeMonthId, sanitizedData, user?.uid || 'admin');
       return { success: true, deposit: created };
     } catch (err) {
       setError(err.message);
@@ -49,11 +53,19 @@ export const useDeposits = (customMonthId = null) => {
     } finally {
       setActionLoading(false);
     }
-  }, [activeMonthId, isClosed, user]);
+  }, [activeMonthId, isClosed, isAdmin, currentMemberId, user]);
 
   const updateDeposit = useCallback(async (depositId, depositData) => {
     if (isClosed) {
       return { success: false, error: 'This month is closed. Data cannot be modified.' };
+    }
+
+    // Check permission: Admin can edit all deposits; Member can only edit their own
+    if (!isAdmin) {
+      const targetDeposit = deposits.find(d => d.id === depositId);
+      if (!targetDeposit || targetDeposit.memberId !== currentMemberId) {
+        return { success: false, error: 'Permission denied: You can only edit your own deposits.' };
+      }
     }
 
     const validation = validateDeposit(depositData);
@@ -73,11 +85,19 @@ export const useDeposits = (customMonthId = null) => {
     } finally {
       setActionLoading(false);
     }
-  }, [activeMonthId, isClosed]);
+  }, [activeMonthId, isClosed, isAdmin, deposits, currentMemberId]);
 
   const deleteDeposit = useCallback(async (depositId) => {
     if (isClosed) {
       return { success: false, error: 'This month is closed. Data cannot be modified.' };
+    }
+
+    // Check permission: Admin can delete any deposit; Member can only delete their own
+    if (!isAdmin) {
+      const targetDeposit = deposits.find(d => d.id === depositId);
+      if (!targetDeposit || targetDeposit.memberId !== currentMemberId) {
+        return { success: false, error: 'Permission denied: You can only delete your own deposits.' };
+      }
     }
 
     setActionLoading(true);
@@ -91,7 +111,7 @@ export const useDeposits = (customMonthId = null) => {
     } finally {
       setActionLoading(false);
     }
-  }, [activeMonthId, isClosed]);
+  }, [activeMonthId, isClosed, isAdmin, deposits, currentMemberId]);
 
   const totalDeposits = calculateTotalDeposits(deposits);
 

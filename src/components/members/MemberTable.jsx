@@ -6,6 +6,8 @@ import { formatDateDisplay } from '../../utils/dateUtils';
 
 export const MemberTable = ({
   members = [],
+  isAdmin = true,
+  currentMemberId = null,
   onEdit,
   onDeactivate,
   onActivate,
@@ -29,6 +31,9 @@ export const MemberTable = ({
           <tbody className="divide-y divide-slate-100">
             {members.map((member) => {
               const isActive = member.status === 'active';
+              const isMe = member.id === currentMemberId;
+              const canEditThisMember = isAdmin || isMe;
+
               return (
                 <tr
                   key={member.id}
@@ -48,7 +53,7 @@ export const MemberTable = ({
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-slate-900 font-medium">
-                            {member.name}
+                            {member.name} {isMe ? '(You)' : ''}
                           </span>
                           {member.role === 'admin' && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
@@ -108,31 +113,35 @@ export const MemberTable = ({
                         title="View details and history"
                         icon={Eye}
                       />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onEdit(member)}
-                        title="Edit member"
-                        icon={Edit2}
-                      />
-                      {isActive ? (
+                      {canEditThisMember && (
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => onDeactivate(member)}
-                          title="Deactivate member"
-                          icon={UserX}
-                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          onClick={() => onEdit(member)}
+                          title="Edit profile"
+                          icon={Edit2}
                         />
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onActivate(member)}
-                          title="Reactivate member"
-                          icon={UserCheck}
-                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                        />
+                      )}
+                      {isAdmin && (
+                        isActive ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDeactivate(member)}
+                            title="Deactivate member"
+                            icon={UserX}
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          />
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onActivate(member)}
+                            title="Reactivate member"
+                            icon={UserCheck}
+                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          />
+                        )
                       )}
                     </div>
                   </td>

@@ -9,6 +9,10 @@ export const MarketCostTable = ({
   costs = [],
   totalCost = 0,
   isClosed = false,
+  isAdmin = true,
+  currentUserId = null,
+  currentMemberId = null,
+  currentUserName = null,
   onEdit,
   onDelete,
   onAddCost,
@@ -39,47 +43,61 @@ export const MarketCostTable = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {costs.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                <td className="py-3.5 px-4 sm:px-6 font-medium text-slate-900 whitespace-nowrap">
-                  {formatDateDisplay(item.date)}
-                </td>
-                <td className="py-3.5 px-4">
-                  <p className="text-slate-800 font-medium">{item.description || 'Grocery expense'}</p>
-                  <span className="text-[11px] text-slate-400">ID: {item.id}</span>
-                </td>
-                <td className="py-3.5 px-4 whitespace-nowrap">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    {item.buyerName || 'Administrator'}
-                  </span>
-                </td>
-                <td className="py-3.5 px-4 text-right font-bold text-slate-900 whitespace-nowrap">
-                  {formatCurrency(item.amount)}
-                </td>
-                {!isClosed && (
-                  <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onEdit(item)}
-                        title="Edit expense"
-                        icon={Edit2}
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onDelete(item)}
-                        title="Delete expense"
-                        icon={Trash2}
-                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                      />
-                    </div>
+            {costs.map((item) => {
+              const isOwner = (
+                item.createdBy === currentUserId ||
+                item.createdBy === currentMemberId ||
+                item.buyerId === currentMemberId ||
+                item.buyerName === currentUserName
+              );
+              const canEditThisCost = isAdmin || isOwner;
+
+              return (
+                <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="py-3.5 px-4 sm:px-6 font-medium text-slate-900 whitespace-nowrap">
+                    {formatDateDisplay(item.date)}
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="py-3.5 px-4">
+                    <p className="text-slate-800 font-medium">{item.description || 'Grocery expense'}</p>
+                    <span className="text-[11px] text-slate-400">ID: {item.id}</span>
+                  </td>
+                  <td className="py-3.5 px-4 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      {item.buyerName || 'Administrator'}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-bold text-slate-900 whitespace-nowrap">
+                    {formatCurrency(item.amount)}
+                  </td>
+                  {!isClosed && (
+                    <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap">
+                      {canEditThisCost ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onEdit(item)}
+                            title="Edit expense"
+                            icon={Edit2}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDelete(item)}
+                            title="Delete expense"
+                            icon={Trash2}
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">Protected</span>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-200">

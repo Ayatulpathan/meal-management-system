@@ -7,7 +7,7 @@ import { calculateTotalMarketCost } from '../utils/calculations';
 
 export const useMarketCosts = (customMonthId = null) => {
   const { selectedMonth, isClosed } = useMonthContext();
-  const { user } = useAuthContext();
+  const { user, isAdmin, currentMemberId } = useAuthContext();
   const activeMonthId = customMonthId || selectedMonth;
 
   const [marketCosts, setMarketCosts] = useState([]);
@@ -41,7 +41,7 @@ export const useMarketCosts = (customMonthId = null) => {
     setActionLoading(true);
     setError(null);
     try {
-      const created = await marketCostService.addMarketCost(activeMonthId, costData, user?.uid || 'admin');
+      const created = await marketCostService.addMarketCost(activeMonthId, costData, user || 'admin');
       return { success: true, cost: created };
     } catch (err) {
       setError(err.message);
@@ -54,6 +54,20 @@ export const useMarketCosts = (customMonthId = null) => {
   const updateMarketCost = useCallback(async (costId, costData) => {
     if (isClosed) {
       return { success: false, error: 'This month is closed. Data cannot be modified.' };
+    }
+
+    // Check permission: Admin can edit all, member can only edit their own
+    if (!isAdmin) {
+      const targetCost = marketCosts.find(c => c.id === costId);
+      const isOwner = targetCost && (
+        targetCost.createdBy === user?.uid ||
+        targetCost.createdBy === currentMemberId ||
+        targetCost.buyerId === currentMemberId ||
+        targetCost.buyerName === user?.displayName
+      );
+      if (!isOwner) {
+        return { success: false, error: 'Permission denied: You can only edit expenses recorded by you.' };
+      }
     }
 
     const validation = validateMarketCost(costData);
@@ -73,11 +87,25 @@ export const useMarketCosts = (customMonthId = null) => {
     } finally {
       setActionLoading(false);
     }
-  }, [activeMonthId, isClosed]);
+  }, [activeMonthId, isClosed, isAdmin, marketCosts, user, currentMemberId]);
 
   const deleteMarketCost = useCallback(async (costId) => {
     if (isClosed) {
       return { success: false, error: 'This month is closed. Data cannot be modified.' };
+    }
+
+    // Check permission: Admin can delete all, member can only delete their own
+    if (!isAdmin) {
+      const targetCost = marketCosts.find(c => c.id === costId);
+      const isOwner = targetCost && (
+        targetCost.createdBy === user?.uid ||
+        targetCost.createdBy === currentMemberId ||
+        targetCost.buyerId === currentMemberId ||
+        targetCost.buyerName === user?.displayName
+      );
+      if (!isOwner) {
+        return { success: false, error: 'Permission denied: You can only delete expenses recorded by you.' };
+      }
     }
 
     setActionLoading(true);
@@ -91,7 +119,7 @@ export const useMarketCosts = (customMonthId = null) => {
     } finally {
       setActionLoading(false);
     }
-  }, [activeMonthId, isClosed]);
+  }, [activeMonthId, isClosed, isAdmin, marketCosts, user, currentMemberId]);
 
   const totalMarketCost = calculateTotalMarketCost(marketCosts);
 

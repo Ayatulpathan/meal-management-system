@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Users, UserCheck, UserX, Search } from 'lucide-react';
 import { useMembers } from '../controllers/useMembers';
+import { useAuthContext } from '../context/AuthContext';
 import { MemberTable } from '../components/members/MemberTable';
 import { MemberForm } from '../components/members/MemberForm';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
@@ -9,6 +10,7 @@ import { Loader } from '../components/common/Loader';
 import { EmptyState } from '../components/common/EmptyState';
 
 export const Members = () => {
+  const { isAdmin, currentMemberId } = useAuthContext();
   const {
     members,
     activeMembers,
@@ -94,9 +96,11 @@ export const Members = () => {
           </p>
         </div>
 
-        <Button variant="primary" onClick={handleOpenAdd} icon={Plus}>
-          Add New Member
-        </Button>
+        {isAdmin && (
+          <Button variant="primary" onClick={handleOpenAdd} icon={Plus}>
+            Add New Member
+          </Button>
+        )}
       </div>
 
       {/* Filter Tabs & Search Bar */}
@@ -159,12 +163,14 @@ export const Members = () => {
               ? 'Try refining your search keyword.'
               : 'Add members to start logging meals, costs, and deposits.'
           }
-          actionLabel={searchQuery ? null : 'Add First Member'}
+          actionLabel={isAdmin && !searchQuery ? 'Add First Member' : null}
           onAction={handleOpenAdd}
         />
       ) : (
         <MemberTable
           members={displayedMembers}
+          isAdmin={isAdmin}
+          currentMemberId={currentMemberId}
           onEdit={handleOpenEdit}
           onDeactivate={(member) => setDeactivatingMember(member)}
           onActivate={handleActivate}

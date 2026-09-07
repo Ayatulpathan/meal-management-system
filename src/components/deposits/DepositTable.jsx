@@ -10,6 +10,8 @@ export const DepositTable = ({
   members = [],
   totalDeposits = 0,
   isClosed = false,
+  isAdmin = true,
+  currentMemberId = null,
   onEdit,
   onDelete,
   onAddDeposit,
@@ -42,48 +44,56 @@ export const DepositTable = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {deposits.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                <td className="py-3.5 px-4 sm:px-6 font-medium text-slate-900 whitespace-nowrap">
-                  {formatDateDisplay(item.date)}
-                </td>
-                <td className="py-3.5 px-4 font-semibold text-slate-900">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center">
-                      {(memberMap.get(item.memberId) || 'M').charAt(0).toUpperCase()}
-                    </div>
-                    <span>{memberMap.get(item.memberId) || 'Unknown Member'}</span>
-                  </div>
-                </td>
-                <td className="py-3.5 px-4 text-slate-600">
-                  <span>{item.note || 'Advance payment'}</span>
-                </td>
-                <td className="py-3.5 px-4 text-right font-bold text-emerald-600 whitespace-nowrap">
-                  +{formatCurrency(item.amount)}
-                </td>
-                {!isClosed && (
-                  <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onEdit(item)}
-                        title="Edit deposit"
-                        icon={Edit2}
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onDelete(item)}
-                        title="Delete deposit"
-                        icon={Trash2}
-                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                      />
+            {deposits.map((item) => {
+              const canEditThisDeposit = isAdmin || item.memberId === currentMemberId;
+
+              return (
+                <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="py-3.5 px-4 sm:px-6 font-medium text-slate-900 whitespace-nowrap">
+                    {formatDateDisplay(item.date)}
+                  </td>
+                  <td className="py-3.5 px-4 font-semibold text-slate-900">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center">
+                        {(memberMap.get(item.memberId) || 'M').charAt(0).toUpperCase()}
+                      </div>
+                      <span>{memberMap.get(item.memberId) || 'Unknown Member'}</span>
                     </div>
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="py-3.5 px-4 text-slate-600">
+                    <span>{item.note || 'Advance payment'}</span>
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-bold text-emerald-600 whitespace-nowrap">
+                    +{formatCurrency(item.amount)}
+                  </td>
+                  {!isClosed && (
+                    <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap">
+                      {canEditThisDeposit ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onEdit(item)}
+                            title="Edit deposit"
+                            icon={Edit2}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDelete(item)}
+                            title="Delete deposit"
+                            icon={Trash2}
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">Protected</span>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-200">

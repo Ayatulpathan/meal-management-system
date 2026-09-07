@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { mealService } from '../services/mealService';
 import { useMonthContext } from '../context/MonthContext';
+import { useAuthContext } from '../context/AuthContext';
 import { validateMealValue } from '../utils/validation';
 import { calculateDailyMealTotals, calculateTotalMeals } from '../utils/calculations';
 
 export const useMeals = (customMonthId = null) => {
   const { selectedMonth, currentMonthData, isClosed } = useMonthContext();
+  const { isAdmin, currentMemberId } = useAuthContext();
   const activeMonthId = customMonthId || selectedMonth;
 
   const [mealRecords, setMealRecords] = useState([]);
@@ -31,6 +33,13 @@ export const useMeals = (customMonthId = null) => {
   const setDayMeal = useCallback(async (memberId, day, value) => {
     if (isClosed) {
       return { success: false, error: 'This month is closed. Data cannot be modified.' };
+    }
+
+    // Permission check: Member can only modify their own data, Admin can modify all
+    if (!isAdmin && memberId !== currentMemberId) {
+      const msg = 'Permission denied: Members can only edit their own meal records.';
+      setError(msg);
+      return { success: false, error: msg };
     }
 
     const validation = validateMealValue(value);

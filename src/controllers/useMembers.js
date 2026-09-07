@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { memberService } from '../services/memberService';
+import { useAuthContext } from '../context/AuthContext';
 import { validateMember } from '../utils/validation';
 
 export const useMembers = () => {
+  const { isAdmin, currentMemberId } = useAuthContext();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,6 +21,10 @@ export const useMembers = () => {
   }, []);
 
   const addMember = useCallback(async (memberData) => {
+    if (!isAdmin) {
+      return { success: false, error: 'Permission denied: Only administrators can add members.' };
+    }
+
     const validation = validateMember(memberData);
     if (!validation.isValid) {
       const firstError = Object.values(validation.errors)[0];
@@ -36,9 +42,14 @@ export const useMembers = () => {
     } finally {
       setActionLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   const updateMember = useCallback(async (memberId, memberData) => {
+    // Admin can update any member; Member can only update their own profile
+    if (!isAdmin && memberId !== currentMemberId) {
+      return { success: false, error: 'Permission denied: You can only update your own profile.' };
+    }
+
     const validation = validateMember(memberData);
     if (!validation.isValid) {
       const firstError = Object.values(validation.errors)[0];
@@ -56,9 +67,13 @@ export const useMembers = () => {
     } finally {
       setActionLoading(false);
     }
-  }, []);
+  }, [isAdmin, currentMemberId]);
 
   const deactivateMember = useCallback(async (memberId) => {
+    if (!isAdmin) {
+      return { success: false, error: 'Permission denied: Only administrators can deactivate members.' };
+    }
+
     setActionLoading(true);
     setError(null);
     try {
@@ -70,9 +85,13 @@ export const useMembers = () => {
     } finally {
       setActionLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   const activateMember = useCallback(async (memberId) => {
+    if (!isAdmin) {
+      return { success: false, error: 'Permission denied: Only administrators can reactivate members.' };
+    }
+
     setActionLoading(true);
     setError(null);
     try {
@@ -84,7 +103,7 @@ export const useMembers = () => {
     } finally {
       setActionLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   const activeMembers = members.filter(m => m.status === 'active');
   const inactiveMembers = members.filter(m => m.status === 'inactive');

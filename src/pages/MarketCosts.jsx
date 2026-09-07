@@ -99,6 +99,10 @@ export const MarketCosts = () => {
         costs={marketCosts}
         totalCost={totalMarketCost}
         isClosed={isClosed}
+        isAdmin={isAdmin}
+        currentUserId={user?.uid}
+        currentMemberId={user?.memberId}
+        currentUserName={user?.displayName}
         onEdit={handleOpenEdit}
         onDelete={(cost) => setDeletingCost(cost)}
         onAddCost={handleOpenAdd}

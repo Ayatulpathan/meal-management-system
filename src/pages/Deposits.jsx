@@ -3,6 +3,7 @@ import { Plus, Wallet, Lock } from 'lucide-react';
 import { useDeposits } from '../controllers/useDeposits';
 import { useMembers } from '../controllers/useMembers';
 import { useMonthContext } from '../context/MonthContext';
+import { useAuthContext } from '../context/AuthContext';
 import { DepositTable } from '../components/deposits/DepositTable';
 import { DepositForm } from '../components/deposits/DepositForm';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
@@ -12,6 +13,7 @@ import { formatCurrency } from '../utils/currencyUtils';
 
 export const Deposits = () => {
   const { currentMonthData, isClosed } = useMonthContext();
+  const { isAdmin, currentMemberId } = useAuthContext();
   const { members } = useMembers();
   const {
     deposits,
@@ -98,6 +100,8 @@ export const Deposits = () => {
         members={members}
         totalDeposits={totalDeposits}
         isClosed={isClosed}
+        isAdmin={isAdmin}
+        currentMemberId={currentMemberId}
         onEdit={handleOpenEdit}
         onDelete={(dep) => setDeletingDeposit(dep)}
         onAddDeposit={handleOpenAdd}
@@ -108,7 +112,7 @@ export const Deposits = () => {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSubmit={handleFormSubmit}
-        members={members}
+        members={isAdmin ? members : members.filter(m => m.id === currentMemberId)}
         initialData={editingDeposit}
         loading={actionLoading}
       />

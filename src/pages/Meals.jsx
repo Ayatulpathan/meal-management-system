@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UtensilsCrossed, Plus, Lock, AlertCircle, Info } from 'lucide-react';
+import { UtensilsCrossed, Plus, Lock } from 'lucide-react';
 import { useMeals } from '../controllers/useMeals';
 import { useMembers } from '../controllers/useMembers';
 import { useMonthContext } from '../context/MonthContext';
+import { useAuthContext } from '../context/AuthContext';
 import { MealGrid } from '../components/meals/MealGrid';
 import { MemberForm } from '../components/members/MemberForm';
 import { Button } from '../components/common/Button';
@@ -13,6 +14,7 @@ import { ErrorMessage } from '../components/common/ErrorMessage';
 export const Meals = () => {
   const navigate = useNavigate();
   const { selectedMonth, currentMonthData, isClosed } = useMonthContext();
+  const { isAdmin, currentMemberId } = useAuthContext();
   const { activeMembers, addMember, actionLoading: memberActionLoading } = useMembers();
   const {
     mealRecords,
@@ -28,6 +30,10 @@ export const Meals = () => {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
 
   const handleMealChange = async (memberId, day, value) => {
+    // If not admin, verify memberId matches current user's member ID
+    if (!isAdmin && memberId !== currentMemberId) {
+      return;
+    }
     await setDayMeal(memberId, day, value);
   };
 
@@ -57,7 +63,7 @@ export const Meals = () => {
             ) : null}
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Record daily meals (0, 1, or 2) for <strong>{currentMonthData?.monthName}</strong> ({daysCount} days)
+            Record daily meals (0 to 10) for <strong>{currentMonthData?.monthName}</strong> ({daysCount} days)
           </p>
         </div>
 
@@ -65,7 +71,7 @@ export const Meals = () => {
           <div className="bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-xl text-xs font-bold text-emerald-800">
             Total Monthly Meals: {totalMealsCount}
           </div>
-          {!isClosed && (
+          {isAdmin && !isClosed && (
             <Button
               variant="outline"
               size="sm"
@@ -94,6 +100,8 @@ export const Meals = () => {
         dailyTotals={dailyTotals}
         totalMeals={totalMealsCount}
         isClosed={isClosed}
+        isAdmin={isAdmin}
+        currentMemberId={currentMemberId}
         savingCell={savingCell}
         onMealChange={handleMealChange}
         onAddMember={() => setIsAddMemberOpen(true)}

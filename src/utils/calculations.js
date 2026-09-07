@@ -1,6 +1,6 @@
 /**
  * Centralized Calculation Engine for Meal Management System
- * Adheres strictly to Sections 15–23 and 51–53 of the specification.
+ * Supports meal values from 0 to 10 per member per day.
  */
 
 /**
@@ -18,14 +18,14 @@ export const calculateTotalMarketCost = (marketCosts = []) => {
 
 /**
  * Calculates total meals for a single member from their daily meal object
- * @param {Record<string, number>} mealsObj e.g. { "1": 2, "2": 1, "3": 0 }
+ * @param {Record<string, number>} mealsObj e.g. { "1": 2, "2": 5, "3": 0 }
  * @returns {number}
  */
 export const calculateMemberTotalMeals = (mealsObj = {}) => {
   if (!mealsObj || typeof mealsObj !== 'object') return 0;
   return Object.values(mealsObj).reduce((sum, val) => {
     const num = Number(val) || 0;
-    return sum + ([0, 1, 2].includes(num) ? num : 0);
+    return sum + (num >= 0 && num <= 10 ? num : 0);
   }, 0);
 };
 
@@ -128,10 +128,10 @@ export const calculateMemberSummaries = (members = [], mealDocs = [], deposits =
 /**
  * Calculates daily meal totals for each day of the month
  * @param {Array<{ meals?: Record<string, number> }>} mealDocs 
- * @param {number} totalDays e.g. 30
+ * @param {number} totalDays e.g. 31
  * @returns {Record<string, number>}
  */
-export const calculateDailyMealTotals = (mealDocs = [], totalDays = 30) => {
+export const calculateDailyMealTotals = (mealDocs = [], totalDays = 31) => {
   const dailyTotals = {};
   for (let day = 1; day <= totalDays; day++) {
     const dayKey = String(day);
@@ -142,7 +142,7 @@ export const calculateDailyMealTotals = (mealDocs = [], totalDays = 30) => {
     const meals = doc?.meals || {};
     Object.entries(meals).forEach(([dayKey, count]) => {
       const num = Number(count) || 0;
-      if (dailyTotals[dayKey] !== undefined && [0, 1, 2].includes(num)) {
+      if (dailyTotals[dayKey] !== undefined && num >= 0 && num <= 10) {
         dailyTotals[dayKey] += num;
       }
     });

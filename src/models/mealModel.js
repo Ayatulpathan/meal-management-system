@@ -4,7 +4,7 @@
  * Path: months/{monthId}/meals/{memberId}
  * {
  *   memberId: string,
- *   meals: { [day: string]: 0 | 1 | 2 },
+ *   meals: { [day: string]: number (0 to 10) },
  *   totalMeal: number,
  *   updatedAt: Timestamp | Date | string
  * }
@@ -16,7 +16,7 @@ export const createMealModel = (memberId, meals = {}) => {
   const sanitizedMeals = {};
   Object.entries(meals).forEach(([day, count]) => {
     const num = Number(count);
-    if ([0, 1, 2].includes(num)) {
+    if (!isNaN(num) && num >= 0 && num <= 10) {
       sanitizedMeals[String(day)] = num;
     }
   });

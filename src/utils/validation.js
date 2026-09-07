@@ -3,14 +3,14 @@
  */
 
 /**
- * Validates meal count (Only 0, 1, or 2 are allowed)
+ * Validates meal count (Allowed: 0 to 10 meals per member per day)
  * @param {number|string} val 
  * @returns {{ isValid: boolean, message?: string }}
  */
 export const validateMealValue = (val) => {
   const num = Number(val);
-  if (![0, 1, 2].includes(num)) {
-    return { isValid: false, message: 'Meal count must be 0, 1, or 2 only.' };
+  if (isNaN(num) || !Number.isInteger(num) || num < 0 || num > 10) {
+    return { isValid: false, message: 'Meal count must be an integer between 0 and 10.' };
   }
   return { isValid: true };
 };
@@ -36,7 +36,6 @@ export const validateMember = (member) => {
   }
 
   if (member.phone && member.phone.trim()) {
-    // Bangladeshi phone standard or standard digits (min 7 digits)
     const phoneClean = member.phone.replace(/[\s-]/g, '');
     if (!/^\+?[0-9]{7,15}$/.test(phoneClean)) {
       errors.phone = 'Please provide a valid phone number (e.g. 017XXXXXXXX).';

@@ -20,26 +20,7 @@ const getLocalMonthlyMeals = (monthId) => {
   const key = getLocalMealsKey(monthId);
   const stored = localStorage.getItem(key);
   if (!stored) {
-    // Seed standard demo meals for initial experience (Rahim: 50, Karim: 40, Hasan: 60)
-    const initialMeals = [
-      {
-        memberId: 'member_001',
-        meals: { '1': 2, '2': 2, '3': 2, '4': 2, '5': 2, '6': 2, '7': 2, '8': 2, '9': 2, '10': 2, '11': 2, '12': 2, '13': 2, '14': 2, '15': 2, '16': 2, '17': 2, '18': 2, '19': 2, '20': 2, '21': 2, '22': 2, '23': 2, '24': 2, '25': 2 },
-        totalMeal: 50,
-      },
-      {
-        memberId: 'member_002',
-        meals: { '1': 2, '2': 1, '3': 2, '4': 1, '5': 2, '6': 1, '7': 2, '8': 1, '9': 2, '10': 1, '11': 2, '12': 1, '13': 2, '14': 1, '15': 2, '16': 1, '17': 2, '18': 1, '19': 2, '20': 1, '21': 2, '22': 1, '23': 2, '24': 1, '25': 2, '26': 1, '27': 2 },
-        totalMeal: 40,
-      },
-      {
-        memberId: 'member_003',
-        meals: { '1': 2, '2': 2, '3': 2, '4': 2, '5': 2, '6': 2, '7': 2, '8': 2, '9': 2, '10': 2, '11': 2, '12': 2, '13': 2, '14': 2, '15': 2, '16': 2, '17': 2, '18': 2, '19': 2, '20': 2, '21': 2, '22': 2, '23': 2, '24': 2, '25': 2, '26': 2, '27': 2, '28': 2, '29': 2, '30': 2 },
-        totalMeal: 60,
-      },
-    ];
-    localStorage.setItem(key, JSON.stringify(initialMeals));
-    return initialMeals;
+    return [];
   }
   try {
     return JSON.parse(stored);
@@ -73,7 +54,8 @@ export const mealService = {
       const meals = snapshot.docs.map(d => sanitizeMeal(d.id, d.data()));
       callback(meals);
     }, (error) => {
-      console.error(`Error subscribing to meals for month ${monthId}:`, error);
+      console.warn(`Firestore meals listener fallback for month ${monthId}:`, error);
+      callback(getLocalMonthlyMeals(monthId));
     });
   },
 
@@ -93,19 +75,18 @@ export const mealService = {
       return snapshot.docs.map(d => sanitizeMeal(d.id, d.data()));
     } catch (err) {
       console.error(`Error fetching meals for month ${monthId}:`, err);
-      throw new Error('Unable to load meals.');
+      return getLocalMonthlyMeals(monthId);
     }
   },
 
   /**
    * Update a single day's meal for a member in a specific month
-   * Day count must be 0, 1, or 2.
-   * Modifies only the relevant member document: months/{monthId}/meals/{memberId}
+   * Day count must be between 0 and 10.
    */
   async updateDayMeal(monthId, memberId, day, mealCount) {
     const numCount = Number(mealCount);
-    if (![0, 1, 2].includes(numCount)) {
-      throw new Error('Meal value must be 0, 1, or 2.');
+    if (isNaN(numCount) || numCount < 0 || numCount > 10) {
+      throw new Error('Meal value must be between 0 and 10.');
     }
 
     const dayKey = String(day);

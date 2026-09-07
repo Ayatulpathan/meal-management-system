@@ -17,6 +17,7 @@ export const MemberForm = ({
     phone: '',
     email: '',
     password: 'member123',
+    role: 'member',
     status: 'active',
   });
   const [errors, setErrors] = useState({});
@@ -28,6 +29,7 @@ export const MemberForm = ({
         phone: initialData.phone || '',
         email: initialData.email || '',
         password: initialData.password || 'member123',
+        role: initialData.role || 'member',
         status: initialData.status || 'active',
       });
     } else {
@@ -36,6 +38,7 @@ export const MemberForm = ({
         phone: '',
         email: '',
         password: 'member123',
+        role: 'member',
         status: 'active',
       });
     }
@@ -108,6 +111,18 @@ export const MemberForm = ({
           placeholder="e.g. member123"
           prefix={<KeyRound className="w-4 h-4" />}
           helperText="Default password is 'member123'"
+        />
+
+        <Select
+          label="Account Role & Permissions"
+          name="role"
+          value={formData.role}
+          onChange={handleChange}
+          options={[
+            { value: 'member', label: 'Regular Mess Member (Personal Portal Only)' },
+            { value: 'admin', label: 'Administrator / Manager (Full Access)' },
+          ]}
+          helperText="Admins can edit all records, manage groceries, deposits, and reports."
         />
 
         {isEditing && (

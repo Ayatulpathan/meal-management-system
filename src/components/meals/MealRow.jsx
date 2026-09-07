@@ -6,6 +6,7 @@ export const MealRow = ({
   daysList = [],
   mealRecord,
   isClosed = false,
+  canEdit = true,
   savingCell = null,
   onMealChange,
 }) => {
@@ -22,7 +23,7 @@ export const MealRow = ({
           </div>
           <div className="truncate">
             <span className="text-xs font-semibold text-slate-800 block truncate" title={member.name}>
-              {member.name}
+              {member.name} {!canEdit ? '🔒' : ''}
             </span>
           </div>
         </div>
@@ -38,6 +39,7 @@ export const MealRow = ({
               value={val}
               day={day}
               memberId={member.id}
+              canEdit={canEdit}
               isClosed={isClosed}
               isSaving={isSaving}
               onChange={onMealChange}

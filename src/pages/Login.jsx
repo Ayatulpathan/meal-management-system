@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UtensilsCrossed, Lock, Mail, ArrowRight, UserCheck, ShieldCheck, Sparkles, User } from 'lucide-react';
+import { UtensilsCrossed, Lock, Mail, ArrowRight, ShieldCheck, User } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
-import { isFirebaseConfigured } from '../services/firebase';
 
 export const Login = () => {
   const { login } = useAuthContext();
@@ -12,8 +11,8 @@ export const Login = () => {
   const location = useLocation();
 
   const [activeTab, setActiveTab] = useState('admin'); // 'admin' or 'member'
-  const [email, setEmail] = useState('admin@mealmanager.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -22,20 +21,8 @@ export const Login = () => {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setError(null);
-    if (tab === 'admin') {
-      setEmail('admin@mealmanager.com');
-      setPassword('admin123');
-    } else {
-      setEmail('rahim@example.com');
-      setPassword('member123');
-    }
-  };
-
-  const selectQuickMember = (memberEmail) => {
-    setActiveTab('member');
-    setEmail(memberEmail);
-    setPassword('member123');
-    setError(null);
+    setEmail('');
+    setPassword('');
   };
 
   const handleSubmit = async (e) => {
@@ -50,7 +37,7 @@ export const Login = () => {
         const defaultDestination = userRole === 'member' ? '/portal' : '/dashboard';
         navigate(from || defaultDestination, { replace: true });
       } else {
-        setError(result.error || 'Failed to sign in. Please verify credentials.');
+        setError(result.error || 'Invalid credentials. Please check and try again.');
       }
     } catch (err) {
       setError(err.message || 'An error occurred during sign in.');
@@ -69,7 +56,7 @@ export const Login = () => {
           Meal Management System
         </h2>
         <p className="mt-2 text-sm text-slate-400">
-          Sign in as a Manager or Mess Member to access your accounts.
+          Sign in to access your meal records, balances, and reports.
         </p>
       </div>
 
@@ -110,61 +97,16 @@ export const Login = () => {
             </div>
           )}
 
-          {/* Quick Demo Credentials Badges */}
-          <div className="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-600">Quick Test Accounts:</span>
-              <span className="text-[10px] text-emerald-600 font-bold">1-Click Sign-in</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => { handleTabChange('admin'); setEmail('admin@mealmanager.com'); setPassword('admin123'); }}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                  activeTab === 'admin' ? 'bg-slate-900 text-white' : 'bg-white border text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                👑 Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => selectQuickMember('rahim@example.com')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                  activeTab === 'member' && email === 'rahim@example.com' ? 'bg-emerald-600 text-white' : 'bg-white border text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                👤 Rahim
-              </button>
-              <button
-                type="button"
-                onClick={() => selectQuickMember('karim@example.com')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                  activeTab === 'member' && email === 'karim@example.com' ? 'bg-emerald-600 text-white' : 'bg-white border text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                👤 Karim
-              </button>
-              <button
-                type="button"
-                onClick={() => selectQuickMember('hasan@example.com')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                  activeTab === 'member' && email === 'hasan@example.com' ? 'bg-emerald-600 text-white' : 'bg-white border text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                👤 Hasan
-              </button>
-            </div>
-          </div>
-
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={handleSubmit} autoComplete="off">
             <Input
               label={activeTab === 'admin' ? 'Admin Email Address' : 'Member Email Address'}
               name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. rahim@example.com"
+              placeholder={activeTab === 'admin' ? 'admin@example.com' : 'member@example.com'}
               prefix={<Mail className="w-4 h-4" />}
+              autoComplete="off"
               required
             />
 
@@ -176,6 +118,7 @@ export const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               prefix={<Lock className="w-4 h-4" />}
+              autoComplete="new-password"
               required
             />
 

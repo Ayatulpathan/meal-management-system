@@ -46,9 +46,16 @@ export const MemberTable = ({
                         {member.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <span className="block text-slate-900 font-medium">
-                          {member.name}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-900 font-medium">
+                            {member.name}
+                          </span>
+                          {member.role === 'admin' && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                              Admin
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[11px] text-slate-400 font-normal">
                           ID: {member.id}
                         </span>

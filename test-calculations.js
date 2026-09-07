@@ -89,11 +89,12 @@ assert(Math.abs(totalMemberMealCostSum - totalMarketCost) < 0.01, `Sum of member
 const zeroCostPerMeal = calculateCostPerMeal(5000, 0);
 assert(zeroCostPerMeal === 0, `Divide by zero meals returns 0 (actual: ${zeroCostPerMeal})`);
 
-// TEST 4: Validation test (0, 1, 2 only)
+// TEST 4: Validation test (0 to 10 range)
 assert(validateMealValue(0).isValid === true, 'Meal value 0 is valid');
 assert(validateMealValue(1).isValid === true, 'Meal value 1 is valid');
-assert(validateMealValue(2).isValid === true, 'Meal value 2 is valid');
-assert(validateMealValue(3).isValid === false, 'Meal value 3 is rejected');
+assert(validateMealValue(5).isValid === true, 'Meal value 5 is valid');
+assert(validateMealValue(10).isValid === true, 'Meal value 10 is valid');
+assert(validateMealValue(11).isValid === false, 'Meal value 11 is rejected');
 assert(validateMealValue(-1).isValid === false, 'Negative meal value is rejected');
 
 // TEST 5: Market cost validation (amount > 0)

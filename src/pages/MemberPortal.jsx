@@ -9,10 +9,8 @@ import {
   Calendar, 
   Lock, 
   Info,
-  Clock,
   Sparkles,
-  CheckCircle2,
-  AlertCircle
+  CheckCircle2
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { useMonthContext } from '../context/MonthContext';
@@ -26,7 +24,7 @@ import { Loader } from '../components/common/Loader';
 import { MarketCostForm } from '../components/market/MarketCostForm';
 import { DepositForm } from '../components/deposits/DepositForm';
 import { formatCurrency, formatBalance } from '../utils/currencyUtils';
-import { getDayList, formatDateDisplay, getTodayDayNumber, getTodayDateString } from '../utils/dateUtils';
+import { getDayList, formatDateDisplay, getTodayDayNumber } from '../utils/dateUtils';
 
 export const MemberPortal = () => {
   const { user, currentMemberId } = useAuthContext();
@@ -74,7 +72,7 @@ export const MemberPortal = () => {
   const handleMealToggle = async (day) => {
     if (isClosed) return;
     const currentVal = myMealRecord.meals?.[String(day)] ?? 0;
-    const nextVal = (currentVal + 1) % 3; // 0 -> 1 -> 2 -> 0
+    const nextVal = (currentVal + 1) % 11; // 0 -> 1 -> 2 -> ... -> 10 -> 0
     await setDayMeal(memberId, day, nextVal);
   };
 
@@ -95,6 +93,15 @@ export const MemberPortal = () => {
   }
 
   const isSurplus = mySummary.balance >= 0;
+
+  const getMealBadgeColor = (count) => {
+    if (count === 0) return 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100';
+    if (count === 1) return 'bg-sky-500 border-sky-600 text-white shadow-md shadow-sky-500/20';
+    if (count === 2) return 'bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-500/20';
+    if (count <= 4) return 'bg-teal-600 border-teal-700 text-white shadow-md shadow-teal-600/20';
+    if (count <= 7) return 'bg-indigo-600 border-indigo-700 text-white shadow-md shadow-indigo-600/20';
+    return 'bg-rose-600 border-rose-700 text-white shadow-md shadow-rose-600/20';
+  };
 
   return (
     <div className="space-y-6">
@@ -223,10 +230,10 @@ export const MemberPortal = () => {
             <div>
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Utensils className="w-5 h-5 text-emerald-600" />
-                My Daily Meal Attendance
+                My Daily Meal Attendance (31 Days)
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Click any day card to cycle your meal count: <strong>0 (Off) → 1 (Single) → 2 (Double) → 0</strong>
+                Tap any day to cycle your meals: <strong>0 → 1 → 2 → 3 ... up to 10 meals/day</strong>
               </p>
             </div>
 
@@ -252,23 +259,17 @@ export const MemberPortal = () => {
                   type="button"
                   onClick={() => handleMealToggle(day)}
                   disabled={isClosed || isSaving}
-                  title={`Day ${day}: Click to cycle (Current: ${val})`}
+                  title={`Day ${day}: Tap to cycle (0 to 10) | Current: ${val}`}
                   className={`p-3 rounded-2xl border text-center transition-all duration-150 transform active:scale-95 flex flex-col items-center justify-between gap-1.5 select-none ${
                     isToday ? 'ring-2 ring-emerald-500 ring-offset-2' : ''
-                  } ${
-                    val === 2
-                      ? 'bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                      : val === 1
-                      ? 'bg-sky-500 border-sky-600 text-white shadow-md shadow-sky-500/20'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                  } ${isClosed ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                  } ${getMealBadgeColor(val)} ${isClosed ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                 >
                   <span className={`text-[10px] font-semibold uppercase tracking-wider block ${val > 0 ? 'text-white/80' : 'text-slate-400'}`}>
                     Day {String(day).padStart(2, '0')} {isToday ? '★' : ''}
                   </span>
                   <span className="text-xl font-black">{val}</span>
                   <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-md ${val > 0 ? 'bg-white/20 text-white' : 'text-slate-400'}`}>
-                    {val === 2 ? 'Double' : val === 1 ? 'Single' : 'No meal'}
+                    {val === 0 ? 'Off' : `${val} ${val === 1 ? 'meal' : 'meals'}`}
                   </span>
                 </button>
               );

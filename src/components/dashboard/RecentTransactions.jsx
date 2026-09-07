@@ -12,6 +12,7 @@ export const RecentTransactions = ({ marketCosts = [], deposits = [], members = 
       id: `cost_${c.id}`,
       type: 'cost',
       title: c.description || 'Grocery & Market Expense',
+      subtitle: `By ${c.buyerName || 'Administrator'}`,
       date: c.date,
       amount: c.amount,
       createdAt: c.createdAt,
@@ -68,7 +69,9 @@ export const RecentTransactions = ({ marketCosts = [], deposits = [], members = 
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800 truncate">{item.title}</p>
-                  <p className="text-xs text-slate-400">{formatDateDisplay(item.date)}</p>
+                  <p className="text-xs text-slate-400">
+                    {formatDateDisplay(item.date)} {item.subtitle ? `• ${item.subtitle}` : ''}
+                  </p>
                 </div>
               </div>
               <div className="text-right shrink-0">

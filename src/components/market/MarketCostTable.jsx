@@ -33,6 +33,7 @@ export const MarketCostTable = ({
             <tr>
               <th className="py-3.5 px-4 sm:px-6">Date</th>
               <th className="py-3.5 px-4">Description / Items</th>
+              <th className="py-3.5 px-4">Purchased By</th>
               <th className="py-3.5 px-4 text-right">Amount</th>
               {!isClosed && <th className="py-3.5 px-4 sm:px-6 text-right">Actions</th>}
             </tr>
@@ -46,6 +47,12 @@ export const MarketCostTable = ({
                 <td className="py-3.5 px-4">
                   <p className="text-slate-800 font-medium">{item.description || 'Grocery expense'}</p>
                   <span className="text-[11px] text-slate-400">ID: {item.id}</span>
+                </td>
+                <td className="py-3.5 px-4 whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    {item.buyerName || 'Administrator'}
+                  </span>
                 </td>
                 <td className="py-3.5 px-4 text-right font-bold text-slate-900 whitespace-nowrap">
                   {formatCurrency(item.amount)}
@@ -76,7 +83,7 @@ export const MarketCostTable = ({
           </tbody>
           <tfoot>
             <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-200">
-              <td colSpan={2} className="py-3.5 px-4 sm:px-6 text-sm uppercase tracking-wider text-slate-700">
+              <td colSpan={3} className="py-3.5 px-4 sm:px-6 text-sm uppercase tracking-wider text-slate-700">
                 Total Market Cost
               </td>
               <td className="py-3.5 px-4 text-right text-base text-emerald-700 font-extrabold whitespace-nowrap">

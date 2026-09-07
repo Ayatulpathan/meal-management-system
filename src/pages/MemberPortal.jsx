@@ -281,7 +281,7 @@ export const MemberPortal = () => {
       {/* TAB 2: Member Personal Expenses & Deposits */}
       {activeTab === 'finances' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* My Market Costs */}
+          {/* Mess Market Costs with Purchaser Name */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -289,8 +289,8 @@ export const MemberPortal = () => {
                   <ShoppingCart className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">My Market Purchases</h3>
-                  <p className="text-xs text-slate-500">Expenses purchased by you for the mess</p>
+                  <h3 className="text-base font-semibold text-slate-900">Mess Grocery & Market Purchases</h3>
+                  <p className="text-xs text-slate-500">All grocery expenses and who did the shopping</p>
                 </div>
               </div>
               {!isClosed && (
@@ -301,18 +301,26 @@ export const MemberPortal = () => {
             </div>
 
             <div className="mt-4 divide-y divide-slate-100 max-h-72 overflow-y-auto">
-              {myMarketCosts.length === 0 ? (
-                <p className="text-xs text-slate-400 py-6 text-center">No market expenses recorded by you yet.</p>
+              {raw.marketCosts.length === 0 ? (
+                <p className="text-xs text-slate-400 py-6 text-center">No market expenses recorded yet for this month.</p>
               ) : (
-                myMarketCosts.map((c) => (
-                  <div key={c.id} className="py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">{c.description || 'Grocery purchase'}</p>
-                      <p className="text-xs text-slate-400">{formatDateDisplay(c.date)}</p>
+                raw.marketCosts.map((c) => {
+                  const isMine = c.createdBy === memberId || c.buyerName === user?.displayName;
+                  return (
+                    <div key={c.id} className="py-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{c.description || 'Grocery purchase'}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-slate-400">{formatDateDisplay(c.date)}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            By: {c.buyerName || 'Administrator'} {isMine ? '(You)' : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-bold text-slate-900 shrink-0">{formatCurrency(c.amount)}</span>
                     </div>
-                    <span className="text-sm font-bold text-slate-900">{formatCurrency(c.amount)}</span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -429,6 +437,8 @@ export const MemberPortal = () => {
         isOpen={isCostModalOpen}
         onClose={() => setIsCostModalOpen(false)}
         onSubmit={handleAddCost}
+        members={raw.members}
+        currentUser={user}
         loading={marketActionLoading}
       />
 

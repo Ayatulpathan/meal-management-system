@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Plus, ShoppingCart, Lock } from 'lucide-react';
 import { useMarketCosts } from '../controllers/useMarketCosts';
+import { useMembers } from '../controllers/useMembers';
 import { useMonthContext } from '../context/MonthContext';
+import { useAuthContext } from '../context/AuthContext';
 import { MarketCostTable } from '../components/market/MarketCostTable';
 import { MarketCostForm } from '../components/market/MarketCostForm';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
@@ -11,6 +13,8 @@ import { formatCurrency } from '../utils/currencyUtils';
 
 export const MarketCosts = () => {
   const { currentMonthData, isClosed } = useMonthContext();
+  const { user } = useAuthContext();
+  const { activeMembers } = useMembers();
   const {
     marketCosts,
     totalMarketCost,
@@ -106,6 +110,8 @@ export const MarketCosts = () => {
         onClose={() => setIsFormOpen(false)}
         onSubmit={handleFormSubmit}
         initialData={editingCost}
+        members={activeMembers}
+        currentUser={user}
         loading={actionLoading}
       />
 

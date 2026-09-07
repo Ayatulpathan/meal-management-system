@@ -25,10 +25,10 @@ const getLocalMarketCosts = (monthId) => {
   if (!stored) {
     // Seed initial demo expenses totaling 30,000 for the sample month
     const initialCosts = [
-      { id: 'cost_001', date: `${monthId}-02`, amount: 10000, description: 'Rice, Oil, Spices and Lentils', createdBy: 'admin', createdAt: new Date().toISOString() },
-      { id: 'cost_002', date: `${monthId}-08`, amount: 8000, description: 'Chicken, Fish, and Fresh Vegetables', createdBy: 'admin', createdAt: new Date().toISOString() },
-      { id: 'cost_003', date: `${monthId}-15`, amount: 7000, description: 'Beef, Onions, and Seasonings', createdBy: 'admin', createdAt: new Date().toISOString() },
-      { id: 'cost_004', date: `${monthId}-22`, amount: 5000, description: 'Eggs, Potatoes, and Daily Groceries', createdBy: 'admin', createdAt: new Date().toISOString() },
+      { id: 'cost_001', date: `${monthId}-02`, amount: 10000, description: 'Rice, Oil, Spices and Lentils', buyerName: 'Rahim Ahmed', createdBy: 'admin', createdAt: new Date().toISOString() },
+      { id: 'cost_002', date: `${monthId}-08`, amount: 8000, description: 'Chicken, Fish, and Fresh Vegetables', buyerName: 'Karim Ullah', createdBy: 'admin', createdAt: new Date().toISOString() },
+      { id: 'cost_003', date: `${monthId}-15`, amount: 7000, description: 'Beef, Onions, and Seasonings', buyerName: 'Hasan Mahmud', createdBy: 'admin', createdAt: new Date().toISOString() },
+      { id: 'cost_004', date: `${monthId}-22`, amount: 5000, description: 'Eggs, Potatoes, and Daily Groceries', buyerName: 'Administrator', createdBy: 'admin', createdAt: new Date().toISOString() },
     ];
     localStorage.setItem(key, JSON.stringify(initialCosts));
     return initialCosts;

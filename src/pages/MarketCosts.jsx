@@ -13,7 +13,7 @@ import { formatCurrency } from '../utils/currencyUtils';
 
 export const MarketCosts = () => {
   const { currentMonthData, isClosed } = useMonthContext();
-  const { user } = useAuthContext();
+  const { user, isAdmin, currentMemberId } = useAuthContext();
   const { activeMembers } = useMembers();
   const {
     marketCosts,

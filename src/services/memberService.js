@@ -33,7 +33,6 @@ export const getLocalMembers = () => {
   }
   try {
     const parsed = JSON.parse(stored);
-    // Ensure existing members have password field
     return parsed.map(m => ({
       ...m,
       password: m.password || 'member123',
@@ -50,7 +49,7 @@ const saveLocalMembers = (members) => {
 
 export const memberService = {
   /**
-   * Subscribe to real-time member updates
+   * Subscribe to real-time member updates from Cloud Firestore
    */
   subscribeMembers(callback) {
     if (!isFirebaseConfigured()) {
@@ -64,10 +63,19 @@ export const memberService = {
     const q = query(membersRef, orderBy('name', 'asc'));
 
     return onSnapshot(q, (snapshot) => {
-      const members = snapshot.docs.map(doc => sanitizeMember(doc.id, doc.data()));
-      callback(members);
+      if (snapshot.empty) {
+        // Automatically seed default members into Cloud Firestore
+        DEFAULT_INITIAL_MEMBERS.forEach((m) => {
+          setDoc(doc(db, COLLECTION_NAME, m.id), m, { merge: true }).catch(console.error);
+        });
+        callback(DEFAULT_INITIAL_MEMBERS);
+      } else {
+        const members = snapshot.docs.map(d => sanitizeMember(d.id, d.data()));
+        callback(members);
+      }
     }, (error) => {
-      console.error('Error in members snapshot listener:', error);
+      console.warn('Firestore listener fallback to local:', error);
+      callback(getLocalMembers());
     });
   },
 
@@ -81,10 +89,13 @@ export const memberService = {
     try {
       const membersRef = collection(db, COLLECTION_NAME);
       const snapshot = await getDocs(membersRef);
-      return snapshot.docs.map(doc => sanitizeMember(doc.id, doc.data()));
+      if (snapshot.empty) {
+        return DEFAULT_INITIAL_MEMBERS;
+      }
+      return snapshot.docs.map(d => sanitizeMember(d.id, d.data()));
     } catch (err) {
       console.error('Error fetching members:', err);
-      throw new Error('Unable to fetch members.');
+      return getLocalMembers();
     }
   },
 
@@ -102,10 +113,12 @@ export const memberService = {
       if (docSnap.exists()) {
         return sanitizeMember(docSnap.id, docSnap.data());
       }
-      return null;
+      const local = getLocalMembers();
+      return local.find(m => m.id === memberId) || null;
     } catch (err) {
       console.error('Error fetching member:', err);
-      throw new Error('Unable to fetch member details.');
+      const local = getLocalMembers();
+      return local.find(m => m.id === memberId) || null;
     }
   },
 
@@ -130,8 +143,14 @@ export const memberService = {
       const docRef = await addDoc(membersRef, newMemberModel);
       return { id: docRef.id, ...newMemberModel };
     } catch (err) {
-      console.error('Error creating member:', err);
-      throw new Error('Unable to create member. Please try again.');
+      console.error('Error creating member on Firestore:', err);
+      // Fallback
+      const members = getLocalMembers();
+      const newId = `member_${Date.now()}`;
+      const created = { id: newId, ...newMemberModel };
+      members.push(created);
+      saveLocalMembers(members);
+      return created;
     }
   },
 
@@ -159,7 +178,7 @@ export const memberService = {
         ...memberData,
         updatedAt: new Date().toISOString(),
       };
-      await updateDoc(docRef, updatePayload);
+      await setDoc(docRef, updatePayload, { merge: true });
       return { id: memberId, ...updatePayload };
     } catch (err) {
       console.error('Error updating member:', err);

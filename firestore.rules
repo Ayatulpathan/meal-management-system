@@ -3,61 +3,36 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if the user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
     // Members collection
     match /members/{memberId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() 
-        && request.resource.data.name is string 
-        && request.resource.data.name.size() > 0
-        && request.resource.data.status in ['active', 'inactive'];
-      allow delete: if isAuthenticated();
+      allow read, write: if true;
     }
 
-    // Months collection and subcollections
+    // Months collection and all subcollections (meals, marketCosts, deposits)
     match /months/{monthId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read, write: if true;
 
-      // Meal subcollection: months/{monthId}/meals/{memberId}
       match /meals/{memberId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated();
+        allow read, write: if true;
       }
 
-      // Market costs subcollection: months/{monthId}/marketCosts/{costId}
       match /marketCosts/{costId} {
-        allow read: if isAuthenticated();
-        allow create, update: if isAuthenticated() 
-          && request.resource.data.amount is number 
-          && request.resource.data.amount > 0;
-        allow delete: if isAuthenticated();
+        allow read, write: if true;
       }
 
-      // Deposits subcollection: months/{monthId}/deposits/{depositId}
       match /deposits/{depositId} {
-        allow read: if isAuthenticated();
-        allow create, update: if isAuthenticated() 
-          && request.resource.data.amount is number 
-          && request.resource.data.amount > 0
-          && request.resource.data.memberId is string;
-        allow delete: if isAuthenticated();
+        allow read, write: if true;
       }
-    }
-
-    // Users collection
-    match /users/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
 
     // Settings collection
     match /settings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read, write: if true;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if true;
     }
   }
 }

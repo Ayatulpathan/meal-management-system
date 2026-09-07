@@ -6,19 +6,33 @@ import {
   UtensilsCrossed, 
   ShoppingCart, 
   Wallet,
-  FileSpreadsheet
+  FileSpreadsheet,
+  UserCheck
 } from 'lucide-react';
-
-const mobileNavItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Meals', path: '/meals', icon: UtensilsCrossed },
-  { name: 'Members', path: '/members', icon: Users },
-  { name: 'Market', path: '/market-costs', icon: ShoppingCart },
-  { name: 'Deposits', path: '/deposits', icon: Wallet },
-  { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
-];
+import { useAuthContext } from '../../context/AuthContext';
 
 export const MobileNavigation = () => {
+  const { isMember } = useAuthContext();
+
+  const adminNavItems = [
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Meals', path: '/meals', icon: UtensilsCrossed },
+    { name: 'Members', path: '/members', icon: Users },
+    { name: 'Market', path: '/market-costs', icon: ShoppingCart },
+    { name: 'Deposits', path: '/deposits', icon: Wallet },
+    { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
+  ];
+
+  const memberNavItems = [
+    { name: 'My Portal', path: '/portal', icon: UserCheck },
+    { name: 'Meals', path: '/meals', icon: UtensilsCrossed },
+    { name: 'Market', path: '/market-costs', icon: ShoppingCart },
+    { name: 'Deposits', path: '/deposits', icon: Wallet },
+    { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
+  ];
+
+  const mobileNavItems = isMember ? memberNavItems : adminNavItems;
+
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-2 py-1 shadow-lg no-print">
       <div className="flex items-center justify-around">

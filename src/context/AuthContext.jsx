@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error };
     }
     setUser(loggedInUser);
-    return { success: true };
+    return { success: true, user: loggedInUser };
   };
 
   const logout = async () => {
@@ -36,8 +36,17 @@ export const AuthProvider = ({ children }) => {
     return res;
   };
 
+  const role = user?.role || 'member';
+  const isAdmin = role === 'admin';
+  const isMember = role === 'member';
+  const currentMemberId = user?.memberId || user?.uid;
+
   const value = {
     user,
+    role,
+    isAdmin,
+    isMember,
+    currentMemberId,
     loading,
     authError,
     isAuthenticated: !!user,

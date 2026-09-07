@@ -4,11 +4,13 @@ import {
   Calendar, 
   Plus, 
   Lock, 
-  Unlock,
-  CheckCircle2,
-  ChevronDown
+  Unlock, 
+  CheckCircle2, 
+  ChevronDown,
+  User
 } from 'lucide-react';
 import { useMonthContext } from '../../context/MonthContext';
+import { useAuthContext } from '../../context/AuthContext';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
@@ -24,6 +26,8 @@ export const Header = ({ onMenuClick }) => {
     isClosed,
     toggleMonthStatus 
   } = useMonthContext();
+
+  const { isAdmin, user } = useAuthContext();
 
   const [isMonthModalOpen, setIsMonthModalOpen] = useState(false);
   const [newMonthInput, setNewMonthInput] = useState('');
@@ -107,30 +111,34 @@ export const Header = ({ onMenuClick }) => {
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsMonthModalOpen(true)}
-          title="Add New Month"
-          icon={Plus}
-          className="hidden md:inline-flex text-slate-700"
-        >
-          New Month
-        </Button>
+        {isAdmin && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsMonthModalOpen(true)}
+              title="Add New Month"
+              icon={Plus}
+              className="hidden md:inline-flex text-slate-700"
+            >
+              New Month
+            </Button>
 
-        <Button
-          variant={isClosed ? 'secondary' : 'outline'}
-          size="sm"
-          onClick={() => toggleMonthStatus()}
-          title={isClosed ? 'Reopen this month for editing' : 'Close this month to make it read-only'}
-          icon={isClosed ? Unlock : Lock}
-          className={`text-xs ${isClosed ? 'border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100' : 'text-slate-600'}`}
-        >
-          {isClosed ? 'Reopen' : 'Close Month'}
-        </Button>
+            <Button
+              variant={isClosed ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => toggleMonthStatus()}
+              title={isClosed ? 'Reopen this month for editing' : 'Close this month to make it read-only'}
+              icon={isClosed ? Unlock : Lock}
+              className={`text-xs ${isClosed ? 'border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100' : 'text-slate-600'}`}
+            >
+              {isClosed ? 'Reopen' : 'Close Month'}
+            </Button>
+          </>
+        )}
       </div>
 
-      {/* Modal for creating custom/future month */}
+      {/* Modal for creating custom/future month (Admin only) */}
       <Modal
         isOpen={isMonthModalOpen}
         onClose={() => setIsMonthModalOpen(false)}

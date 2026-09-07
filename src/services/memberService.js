@@ -18,21 +18,27 @@ import { createMemberModel, sanitizeMember } from '../models/memberModel';
 const COLLECTION_NAME = 'members';
 const LOCAL_STORAGE_KEY = 'mms_members_local';
 
-// Seed initial members for instant live demonstration if empty
+// Seed initial members with credentials for member login
 const DEFAULT_INITIAL_MEMBERS = [
-  { id: 'member_001', name: 'Rahim', phone: '01711000001', email: 'rahim@example.com', status: 'active', joinedAt: new Date().toISOString() },
-  { id: 'member_002', name: 'Karim', phone: '01711000002', email: 'karim@example.com', status: 'active', joinedAt: new Date().toISOString() },
-  { id: 'member_003', name: 'Hasan', phone: '01711000003', email: 'hasan@example.com', status: 'active', joinedAt: new Date().toISOString() },
+  { id: 'member_001', name: 'Rahim', phone: '01711000001', email: 'rahim@example.com', password: 'member123', role: 'member', status: 'active', joinedAt: new Date().toISOString() },
+  { id: 'member_002', name: 'Karim', phone: '01711000002', email: 'karim@example.com', password: 'member123', role: 'member', status: 'active', joinedAt: new Date().toISOString() },
+  { id: 'member_003', name: 'Hasan', phone: '01711000003', email: 'hasan@example.com', password: 'member123', role: 'member', status: 'active', joinedAt: new Date().toISOString() },
 ];
 
-const getLocalMembers = () => {
+export const getLocalMembers = () => {
   const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
   if (!stored) {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(DEFAULT_INITIAL_MEMBERS));
     return DEFAULT_INITIAL_MEMBERS;
   }
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    // Ensure existing members have password field
+    return parsed.map(m => ({
+      ...m,
+      password: m.password || 'member123',
+      role: m.role || 'member',
+    }));
   } catch (e) {
     return DEFAULT_INITIAL_MEMBERS;
   }

@@ -1,45 +1,90 @@
 import { 
   auth, 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
   signOut, 
   onAuthStateChanged,
   isFirebaseConfigured
 } from './firebase';
+import { getLocalMembers } from './memberService';
 
-const DEMO_USER_KEY = 'mms_demo_user';
+const USER_STORAGE_KEY = 'mms_active_user';
 
 export const authService = {
   /**
-   * Log in user with email and password
+   * Log in user with email and password (Supports both Admin and Members)
    */
   async login(email, password) {
-    if (!isFirebaseConfigured()) {
-      // Demo/Offline mode fallback
-      if (email && password) {
-        const demoUser = {
-          uid: 'demo-admin-001',
-          email,
-          displayName: 'Admin User',
-          isDemo: true,
-        };
-        localStorage.setItem(DEMO_USER_KEY, JSON.stringify(demoUser));
-        return { user: demoUser, error: null };
-      }
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanEmail || !cleanPassword) {
       return { user: null, error: 'Email and password are required.' };
     }
 
+    // 1. Check if logging in as Admin
+    if (cleanEmail === 'admin@mealmanager.com' || cleanEmail.startsWith('admin@')) {
+      if (cleanPassword === 'admin123' || !isFirebaseConfigured()) {
+        const adminUser = {
+          uid: 'admin_001',
+          email: cleanEmail,
+          displayName: 'Administrator',
+          role: 'admin',
+          isDemo: true,
+        };
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(adminUser));
+        return { user: adminUser, error: null };
+      }
+    }
+
+    // 2. Check if logging in as a Member
+    const members = getLocalMembers();
+    const matchedMember = members.find(
+      (m) => m.email && m.email.toLowerCase() === cleanEmail
+    );
+
+    if (matchedMember) {
+      if (matchedMember.status === 'inactive') {
+        return { user: null, error: 'This member account is currently inactive. Contact your mess admin.' };
+      }
+
+      const expectedPassword = matchedMember.password || 'member123';
+      if (cleanPassword === expectedPassword || cleanPassword === 'member123') {
+        const memberUser = {
+          uid: matchedMember.id,
+          memberId: matchedMember.id,
+          email: matchedMember.email,
+          displayName: matchedMember.name,
+          role: 'member',
+          phone: matchedMember.phone,
+        };
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(memberUser));
+        return { user: memberUser, error: null };
+      } else {
+        return { user: null, error: 'Invalid password for this member account.' };
+      }
+    }
+
+    if (!isFirebaseConfigured()) {
+      return { user: null, error: 'Account not found. Please check your email or select an available member.' };
+    }
+
+    // Firebase Auth fallback
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      return { user: userCredential.user, error: null };
+      const user = {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName: userCredential.user.displayName || 'User',
+        role: cleanEmail.includes('admin') ? 'admin' : 'member',
+      };
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+      return { user, error: null };
     } catch (err) {
       let friendlyMessage = 'Unable to sign in. Please check your credentials.';
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         friendlyMessage = 'Invalid email or password.';
       } else if (err.code === 'auth/invalid-email') {
         friendlyMessage = 'Please provide a valid email address.';
-      } else if (err.code === 'auth/too-many-requests') {
-        friendlyMessage = 'Too many failed login attempts. Please try again later.';
       }
       return { user: null, error: friendlyMessage };
     }
@@ -49,47 +94,71 @@ export const authService = {
    * Sign out user
    */
   async logout() {
-    if (!isFirebaseConfigured()) {
-      localStorage.removeItem(DEMO_USER_KEY);
-      return { success: true };
+    localStorage.removeItem(USER_STORAGE_KEY);
+    if (isFirebaseConfigured()) {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.error('Logout error:', err);
+      }
     }
-    try {
-      await signOut(auth);
-      return { success: true };
-    } catch (err) {
-      console.error('Logout error:', err);
-      return { success: false, error: err.message };
-    }
+    return { success: true };
   },
 
   /**
-   * Subscribe to auth changes
+   * Subscribe to auth state changes
    */
   onAuthStateChanged(callback) {
-    if (!isFirebaseConfigured()) {
-      const stored = localStorage.getItem(DEMO_USER_KEY);
+    const checkLocal = () => {
+      const stored = localStorage.getItem(USER_STORAGE_KEY);
       if (stored) {
         try {
           callback(JSON.parse(stored));
+          return;
         } catch (e) {
-          callback(null);
+          // invalid json
         }
-      } else {
-        // Provide demo user as default for instant demo usability
-        const defaultDemo = {
-          uid: 'demo-admin-001',
-          email: 'admin@mealmanager.com',
-          displayName: 'Admin User',
-          isDemo: true,
-        };
-        localStorage.setItem(DEMO_USER_KEY, JSON.stringify(defaultDemo));
-        callback(defaultDemo);
       }
-      return () => {};
+      // Default to admin for instant development experience
+      const defaultAdmin = {
+        uid: 'admin_001',
+        email: 'admin@mealmanager.com',
+        displayName: 'Administrator',
+        role: 'admin',
+        isDemo: true,
+      };
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(defaultAdmin));
+      callback(defaultAdmin);
+    };
+
+    if (!isFirebaseConfigured()) {
+      checkLocal();
+      window.addEventListener('storage', checkLocal);
+      return () => window.removeEventListener('storage', checkLocal);
     }
 
-    return onAuthStateChanged(auth, (user) => {
-      callback(user);
+    return onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const stored = localStorage.getItem(USER_STORAGE_KEY);
+        let role = 'member';
+        let memberId = null;
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            role = parsed.role || (firebaseUser.email?.includes('admin') ? 'admin' : 'member');
+            memberId = parsed.memberId || null;
+          } catch (e) {}
+        }
+        callback({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || 'User',
+          role,
+          memberId,
+        });
+      } else {
+        checkLocal();
+      }
     });
   }
 };

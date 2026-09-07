@@ -3,6 +3,7 @@ import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
 import { Select } from '../common/Select';
 import { Button } from '../common/Button';
+import { KeyRound } from 'lucide-react';
 
 export const MemberForm = ({
   isOpen,
@@ -15,6 +16,7 @@ export const MemberForm = ({
     name: '',
     phone: '',
     email: '',
+    password: 'member123',
     status: 'active',
   });
   const [errors, setErrors] = useState({});
@@ -25,6 +27,7 @@ export const MemberForm = ({
         name: initialData.name || '',
         phone: initialData.phone || '',
         email: initialData.email || '',
+        password: initialData.password || 'member123',
         status: initialData.status || 'active',
       });
     } else {
@@ -32,6 +35,7 @@ export const MemberForm = ({
         name: '',
         phone: '',
         email: '',
+        password: 'member123',
         status: 'active',
       });
     }
@@ -61,7 +65,7 @@ export const MemberForm = ({
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Member' : 'Add New Member'}
-      subtitle={isEditing ? 'Update member details' : 'Register a new mess member'}
+      subtitle={isEditing ? 'Update member and login details' : 'Register a new mess member with login access'}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
@@ -84,13 +88,26 @@ export const MemberForm = ({
         />
 
         <Input
-          label="Email Address"
+          label="Email Address (Login Username)"
           name="email"
           type="email"
           value={formData.email}
           onChange={handleChange}
           placeholder="e.g. rahim@example.com"
+          required
           error={errors.email}
+          helperText="Member uses this email address to log in to their Member Portal"
+        />
+
+        <Input
+          label="Member Portal Password"
+          name="password"
+          type="text"
+          value={formData.password}
+          onChange={handleChange}
+          placeholder="e.g. member123"
+          prefix={<KeyRound className="w-4 h-4" />}
+          helperText="Default password is 'member123'"
         />
 
         {isEditing && (
@@ -111,7 +128,7 @@ export const MemberForm = ({
             Cancel
           </Button>
           <Button type="submit" variant="primary" loading={loading}>
-            {isEditing ? 'Save Changes' : 'Add Member'}
+            {isEditing ? 'Save Changes' : 'Register Member'}
           </Button>
         </div>
       </form>

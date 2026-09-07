@@ -10,23 +10,14 @@ import {
   Settings as SettingsIcon, 
   LogOut,
   Sparkles,
-  Lock
+  Lock,
+  UserCheck
 } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMonthContext } from '../../context/MonthContext';
 
-const navigationItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Members', path: '/members', icon: Users },
-  { name: 'Meal Entry', path: '/meals', icon: UtensilsCrossed },
-  { name: 'Market Cost', path: '/market-costs', icon: ShoppingCart },
-  { name: 'Deposits', path: '/deposits', icon: Wallet },
-  { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
-  { name: 'Settings', path: '/settings', icon: SettingsIcon },
-];
-
 export const Sidebar = ({ onClose }) => {
-  const { logout, user } = useAuthContext();
+  const { logout, user, isAdmin, isMember } = useAuthContext();
   const { isClosed, currentMonthData } = useMonthContext();
   const navigate = useNavigate();
 
@@ -34,6 +25,26 @@ export const Sidebar = ({ onClose }) => {
     await logout();
     navigate('/login');
   };
+
+  const adminNavItems = [
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Members', path: '/members', icon: Users },
+    { name: 'Meal Entry Grid', path: '/meals', icon: UtensilsCrossed },
+    { name: 'Market Cost', path: '/market-costs', icon: ShoppingCart },
+    { name: 'Deposits', path: '/deposits', icon: Wallet },
+    { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
+    { name: 'Settings', path: '/settings', icon: SettingsIcon },
+  ];
+
+  const memberNavItems = [
+    { name: 'My Member Portal', path: '/portal', icon: UserCheck },
+    { name: 'Spreadsheet Grid', path: '/meals', icon: UtensilsCrossed },
+    { name: 'Market Expenses', path: '/market-costs', icon: ShoppingCart },
+    { name: 'Deposits Ledger', path: '/deposits', icon: Wallet },
+    { name: 'Monthly Reports', path: '/reports', icon: FileSpreadsheet },
+  ];
+
+  const navigationItems = isMember ? memberNavItems : adminNavItems;
 
   return (
     <aside className="flex flex-col h-full bg-slate-900 text-slate-300 w-64 select-none">
@@ -45,7 +56,7 @@ export const Sidebar = ({ onClose }) => {
         <div>
           <h1 className="text-sm font-bold text-white tracking-wide">MealManager</h1>
           <p className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-            <Sparkles className="w-3 h-3" /> Group Dining
+            <Sparkles className="w-3 h-3" /> {isMember ? 'Member Portal' : 'Admin Console'}
           </p>
         </div>
       </div>
@@ -87,24 +98,29 @@ export const Sidebar = ({ onClose }) => {
 
       {/* User Info & Logout */}
       <div className="p-4 border-t border-slate-800">
-        <div className="flex items-center justify-between p-2 rounded-xl bg-slate-800/60">
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/60">
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center justify-center shrink-0">
-              {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'A'}
+            <div className={`w-8 h-8 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 ${isMember ? 'bg-teal-500/20 text-teal-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+              {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
             </div>
             <div className="overflow-hidden">
-              <p className="text-xs font-medium text-slate-200 truncate">
-                {user?.displayName || 'Administrator'}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-semibold text-slate-200 truncate">
+                  {user?.displayName || 'User'}
+                </p>
+                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${isMember ? 'bg-teal-500/20 text-teal-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                  {isMember ? 'Member' : 'Admin'}
+                </span>
+              </div>
               <p className="text-[10px] text-slate-400 truncate">
-                {user?.email || 'admin@mealmanager.com'}
+                {user?.email || 'user@mealmanager.com'}
               </p>
             </div>
           </div>
           <button
             onClick={handleLogout}
             title="Sign out"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
           >
             <LogOut className="w-4 h-4" />
           </button>

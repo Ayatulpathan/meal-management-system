@@ -1,141 +1,69 @@
-# Meal Management System (React + Firebase)
+# Meal Management System
 
-A modern, production-grade **Meal Management System** built with **React**, **Vite**, **Firebase Cloud Firestore**, and **Firebase Authentication**. Designed for mess groups, shared flats, and hostel dining communities to seamlessly track daily member meals, grocery expenses, advance deposits, and automatically compute accurate cost-per-meal and individual financial balances in **Bangladeshi Taka (৳)**.
-
----
-
-## 🌟 Features
-
-- **MVC-Inspired Architecture**: Strict separation of View (UI), Controller (Custom Hooks), Service (Firebase Firestore SDK), Model (Schemas/Sanitizers), and Calculation Engine.
-- **Spreadsheet Meal Grid**: Dynamic day columns (28–31 days based on month), instant toggle buttons for `0`, `1`, or `2` meals per member per day, sticky member names, and real-time total updates.
-- **Automated Calculation Engine**:
-  - Total Market Cost = $\sum \text{Market Expenses}$
-  - Total Meals = $\sum \text{Member Total Meals}$
-  - Cost Per Meal = $\frac{\text{Total Market Cost}}{\text{Total Meals}}$ (with zero-division prevention)
-  - Member Meal Cost = $\text{Member Meals} \times \text{Cost Per Meal}$
-  - Member Balance = $\text{Total Deposit} - \text{Member Meal Cost}$
-  - Exact accounting reconciliation: $\sum \text{Member Meal Costs} \approx \text{Total Market Cost}$
-- **Member Management**: Add, edit, and deactivate members (soft deactivation preserves historical data).
-- **Multi-Month & Historical Records**: Select any month (`YYYY-MM`) with automatic schema initialization and historical data preservation.
-- **Monthly Closing & Read-Only Lock**: Lock finished months (`status: "closed"`) to prevent edits to meals, costs, or deposits while keeping reports accessible forever.
-- **Audited Financial Statements**: Printable and exportable (CSV) monthly reports and member ledgers with clear positive/negative balance indicators.
-- **Cloud Firestore Security Rules**: Robust server-side authorization enforcing authentication and field constraints.
+A modern, full-stack **Meal Management System** built with **React**, **Vite**, **Tailwind CSS**, and **Google Firebase Cloud Firestore**. Designed for mess groups, hostels, bachelor apartments, and shared dining communities in Bangladesh to manage daily meals, grocery bazaar expenditures, advance member deposits, and instant calculation of meal rates and member balances in **Bangladeshi Taka (৳)**.
 
 ---
 
-## 🏗️ Architecture & Directory Structure
-
-```text
-src/
-├── assets/
-├── components/
-│   ├── common/             # Reusable UI primitives (Button, Input, Select, Modal, ConfirmDialog, Loader, SummaryCard)
-│   ├── layout/             # Application layout, Header with Month Selector, Sidebar, and Mobile Nav
-│   ├── dashboard/          # Dashboard metrics, Today's Meals snapshot, and Recent activity
-│   ├── members/            # Member table, creation/edit modal, and member details breakdown
-│   ├── meals/              # Spreadsheet meal grid with sticky headers and fast meal counters
-│   ├── market/             # Market cost table and expense recording modal
-│   ├── deposits/           # Member deposit ledger and advance money recording modal
-│   └── reports/            # Monthly report, Member balance sheet, and printable statements
-├── pages/                  # Route views (Login, Dashboard, Members, Meals, MarketCosts, Deposits, Reports, Settings)
-├── models/                 # Data schemas & sanitizers (memberModel, mealModel, marketCostModel, depositModel, monthlyModel)
-├── services/               # Firebase & Firestore modular abstractions (firebase, authService, memberService, mealService, etc.)
-├── controllers/            # Controller hooks (useAuth, useMembers, useMeals, useMarketCosts, useDeposits, useMonthlySummary)
-├── context/                # Global contexts (AuthContext, MonthContext)
-├── routes/                 # AppRoutes and ProtectedRoute
-├── utils/                  # Centralized calculations, BDT currency formatter, date & validation utils
-├── App.jsx
-├── main.jsx
-└── index.css
-```
+## 🌐 Live Application
+- **Live Demo & Deployment**: [https://khadok-meal.web.app](https://khadok-meal.web.app)
+- **Source Code**: [https://github.com/Ayatulpathan/meal-management-system](https://github.com/Ayatulpathan/meal-management-system)
 
 ---
 
-## 🛠️ Technology Stack
+## 📖 About The Project
 
-- **Frontend**: React 18, Vite, React Router DOM v6, Lucide React icons, Tailwind CSS
-- **Backend / Database**: Google Firebase Authentication, Cloud Firestore (v11 Modular SDK)
+Managing group dining calculations in shared messes and student hostels is often prone to accounting discrepancies, manual calculation errors, and transparency issues. 
+
+The **Meal Management System** solves these challenges by providing an audited, automated, and real-time collaborative platform where:
+- **Administrators & Mess Managers** have complete administrative control to record daily meals across a full 31-day spreadsheet grid, log bazaar expenses, manage member accounts, collect advance deposits, and generate audited financial statements.
+- **Mess Members** have dedicated self-service portals to monitor their daily meals, check their running personal balances (surplus or dues), review all grocery expenditures with purchaser attribution and creation timestamps, and verify their advance deposit history in read-only mode.
+- **All Community Members** can chat and communicate in real time through an integrated cloud-synchronized mess community chat.
+
+---
+
+## 🌟 Key Features
+
+- **31-Day Spreadsheet Meal Grid**:
+  - Full 31-day dynamic meal entry grid with instant click-to-cycle values (from `0` up to `10` meals per day).
+  - Role-protected access: Admins can update meal records; Members have complete transparency with protected read-only view.
+
+- **Market & Grocery Expense Ledger**:
+  - Record daily bazaar expenses with description, item cost, and purchaser name attribution.
+  - Automatically captures and displays the exact date and real creation time (e.g. `10:45 PM`) for every expense.
+
+- **Member Deposits & Advance Ledger**:
+  - Track advance payments and mess funds collected by the manager.
+  - Automatic reconciliation between total member deposits and total expenditures.
+
+- **Automated Financial Accounting Engine**:
+  - Instant calculation of **Total Market Cost**, **Total Meals**, and **Cost Per Meal (Meal Rate)**.
+  - Individual calculation of each member's **Meal Cost** and **Net Balance** (`+ Surplus` or `- Due`).
+  - Zero-division prevention and audited precision down to the exact Taka.
+
+- **Real-Time Mess Community Chat**:
+  - Built-in real-time group chat for instant communication between members and managers.
+  - Live Firestore cloud synchronization, read receipts, sender role badges (`Admin` vs `Member`), and message timestamps.
+
+- **Audited Financial Statements & Reports**:
+  - Complete monthly accounting balance sheets, member-wise breakdowns, and exportable CSV / printable statements.
+
+- **Multi-Month Accounting & Archive Locking**:
+  - Seamlessly manage multiple monthly accounting cycles (`YYYY-MM`).
+  - Lock closed months into read-only archive mode to prevent retrospective modifications.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React 18, Vite, React Router DOM v6, Tailwind CSS, Lucide React Icons
+- **Backend & Cloud Database**: Google Firebase Cloud Firestore (Real-time modular SDK)
+- **Authentication**: Firebase Authentication
+- **Hosting**: Firebase Hosting
 - **Currency**: Bangladeshi Taka (`৳` / BDT)
 
 ---
 
-## 🚀 Getting Started
+## 👤 Author & Copyright
 
-### 1. Prerequisites
-- Node.js (v18 or higher)
-- npm or yarn
-
-### 2. Installation
-```bash
-# Clone or navigate into the repository
-cd meal-management-system
-
-# Install dependencies
-npm install
-```
-
-### 3. Firebase Configuration
-Create a `.env` file in the root directory (based on `.env.example`):
-
-```env
-VITE_FIREBASE_API_KEY=your_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-```
-
-> **Note**: The application includes an instant local storage sync fallback. You can run and test all features immediately before configuring your Firebase credentials!
-
-### 4. Firestore Database Structure
-The application uses the following Firestore document hierarchy:
-
-```text
-members/
-    {memberId}
-
-months/
-    {monthId}                # e.g., "2026-09"
-        meals/
-            {memberId}       # { meals: { "1": 2, "2": 1 }, totalMeal: 45 }
-        marketCosts/
-            {costId}         # { date: "2026-09-01", amount: 2500, description: "Grocery" }
-        deposits/
-            {depositId}      # { memberId: "member_001", amount: 5000, date: "2026-09-05" }
-
-users/
-    {userId}
-
-settings/
-    {settingId}
-```
-
-### 5. Deploying Firestore Security Rules
-Deploy `firestore.rules` using the Firebase CLI:
-
-```bash
-firebase deploy --only firestore:rules
-```
-
----
-
-## 💻 Available Scripts
-
-- `npm run dev`: Start local development server (default port `3000`).
-- `npm test`: Run calculation engine audit and validation suite.
-- `npm run build`: Compile production-ready bundle into `dist/`.
-- `npm run preview`: Locally preview the production build.
-
----
-
-## 🔒 Security & Best Practices
-
-- **Authentication Guard**: All operational routes (`/dashboard`, `/members`, `/meals`, `/market-costs`, `/deposits`, `/reports`, `/settings`) are strictly protected via `ProtectedRoute`.
-- **Protected Firestore Rules**: Denies unauthenticated access and enforces schema constraints on cost amounts ($> 0$), deposit amounts ($> 0$), and member fields.
-- **Centralized Money Precision**: Uniform currency decimal rounding prevents accumulation of rounding errors across members.
-
----
-
-## 📄 License
-MIT License. Built for dining communities and mess administrations.
+**Developed by Ayatul Khan Pathan**  
+© 2026 Ayatul Khan Pathan. All rights reserved.

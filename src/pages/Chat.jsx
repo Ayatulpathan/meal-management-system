@@ -59,19 +59,6 @@ export const Chat = () => {
     }
   };
 
-  const handleQuickPhrase = (phrase) => {
-    setInputMessage(phrase);
-    inputRef.current?.focus();
-  };
-
-  const quickPhrases = [
-    '🛒 Today\'s market bazaar is complete!',
-    '🍽️ Meal counts have been updated for today.',
-    '💰 Advance deposit has been transferred to mess fund.',
-    '🍲 What is on the menu for dinner tonight?',
-    '⚠️ Reminder: Please check outstanding dues.',
-  ];
-
   if (loading) {
     return <Loader message="Connecting to real-time mess chat..." fullScreen />;
   }
@@ -205,23 +192,6 @@ export const Chat = () => {
           })
         )}
         <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Suggestion Chips */}
-      <div className="px-4 py-2 bg-slate-100/80 border-t border-slate-200/80 overflow-x-auto custom-scrollbar flex items-center gap-2 shrink-0">
-        <span className="text-[10px] uppercase font-bold text-slate-600 shrink-0 flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-emerald-600" /> Quick:
-        </span>
-        {quickPhrases.map((phrase, idx) => (
-          <button
-            key={idx}
-            type="button"
-            onClick={() => handleQuickPhrase(phrase)}
-            className="px-2.5 py-1 bg-white hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 border border-slate-200 rounded-lg text-[11px] text-slate-700 whitespace-nowrap transition-all shadow-xs"
-          >
-            {phrase}
-          </button>
-        ))}
       </div>
 
       {/* Message Input Form */}

@@ -44,10 +44,13 @@ export const Layout = () => {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-20 lg:pb-8 flex flex-col justify-between">
+          <div className="max-w-7xl mx-auto w-full flex-1">
             <Outlet />
           </div>
+          <footer className="mt-8 pt-4 pb-2 border-t border-slate-200/60 text-center text-xs text-slate-400 no-print">
+            © {new Date().getFullYear()} Meal Management System • Developed by <span className="font-semibold text-slate-600">Ayatul Khan Pathan</span>
+          </footer>
         </main>
 
         <MobileNavigation />

@@ -166,6 +166,11 @@ export const Reports = () => {
           members={raw.members}
         />
       )}
+
+      {/* Reports Page & Print Footer */}
+      <div className="pt-6 border-t border-slate-200 text-center text-xs text-slate-400">
+        <p>© {new Date().getFullYear()} Meal Management System • Prepared & Developed by <strong className="text-slate-600">Ayatul Khan Pathan</strong></p>
+      </div>
     </div>
   );
 };

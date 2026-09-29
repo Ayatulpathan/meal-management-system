@@ -134,9 +134,14 @@ export const Login = () => {
           </form>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-500">
-          Bangladeshi Taka (৳) Group Dining & Expense Management
-        </p>
+        <div className="mt-6 text-center space-y-1">
+          <p className="text-xs text-slate-500">
+            Bangladeshi Taka (৳) Group Dining & Expense Management
+          </p>
+          <p className="text-[11px] text-slate-400 font-medium">
+            © {new Date().getFullYear()} Ayatul Khan Pathan. All rights reserved.
+          </p>
+        </div>
       </div>
     </div>
   );

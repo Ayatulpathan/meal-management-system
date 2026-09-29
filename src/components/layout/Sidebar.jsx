@@ -125,6 +125,9 @@ export const Sidebar = ({ onClose }) => {
             <LogOut className="w-4 h-4" />
           </button>
         </div>
+        <div className="text-[10px] text-slate-500 text-center mt-3 font-medium">
+          © {new Date().getFullYear()} Ayatul Khan Pathan
+        </div>
       </div>
     </aside>
   );

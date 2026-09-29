@@ -34,5 +34,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if true;
     }
+
+    // Real-time Chat messages collection
+    match /chatMessages/{messageId} {
+      allow read, write: if true;
+    }
   }
 }

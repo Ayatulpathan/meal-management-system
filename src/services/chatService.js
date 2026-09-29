@@ -65,12 +65,12 @@ export const chatService = {
 
     try {
       const messagesRef = collection(db, 'chatMessages');
-      const q = query(messagesRef, orderBy('createdAt', 'asc'), limit(200));
+      const q = query(messagesRef, orderBy('createdAt', 'asc'), limit(250));
 
       return onSnapshot(q, (snapshot) => {
         const messages = snapshot.docs.map((docSnap) => {
           const data = docSnap.data();
-          let createdAtStr = new Date().toISOString();
+          let createdAtStr = data.createdAtIso || new Date().toISOString();
           if (data.createdAt) {
             if (data.createdAt.toDate && typeof data.createdAt.toDate === 'function') {
               createdAtStr = data.createdAt.toDate().toISOString();
@@ -89,11 +89,10 @@ export const chatService = {
             createdAt: createdAtStr,
           };
         });
+        messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         callback(messages);
       }, (error) => {
         console.error('Error in chat real-time listener:', error);
-        // Fallback to local storage on error
-        callback(getLocalMessages());
       });
     } catch (err) {
       console.error('Chat subscription init error:', err);
@@ -117,6 +116,7 @@ export const chatService = {
       senderName: senderName || 'Member',
       senderRole: senderRole || 'member',
       createdAt: isFirebaseConfigured() ? serverTimestamp() : new Date().toISOString(),
+      createdAtIso: new Date().toISOString(),
     };
 
     if (!isFirebaseConfigured()) {
@@ -135,20 +135,10 @@ export const chatService = {
     try {
       const messagesRef = collection(db, 'chatMessages');
       const docRef = await addDoc(messagesRef, payload);
-      return { id: docRef.id, ...payload };
+      return { id: docRef.id, ...payload, createdAt: payload.createdAtIso };
     } catch (err) {
       console.error('Error sending chat message to Firebase:', err);
-      // Fallback to local storage
-      const messages = getLocalMessages();
-      const newMsg = {
-        id: `msg_${Date.now()}`,
-        ...payload,
-        createdAt: new Date().toISOString(),
-      };
-      messages.push(newMsg);
-      saveLocalMessages(messages);
-      window.dispatchEvent(new Event('storage'));
-      return newMsg;
+      throw err;
     }
   },
 

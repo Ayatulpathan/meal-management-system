@@ -11,7 +11,8 @@ import {
   LogOut,
   Sparkles,
   Lock,
-  UserCheck
+  UserCheck,
+  MessageSquare
 } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMonthContext } from '../../context/MonthContext';
@@ -33,6 +34,7 @@ export const Sidebar = ({ onClose }) => {
     { name: 'Market Cost', path: '/market-costs', icon: ShoppingCart },
     { name: 'Deposits', path: '/deposits', icon: Wallet },
     { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
+    { name: 'Mess Chat', path: '/chat', icon: MessageSquare },
     { name: 'Settings', path: '/settings', icon: SettingsIcon },
   ];
 
@@ -42,6 +44,7 @@ export const Sidebar = ({ onClose }) => {
     { name: 'Market Expenses', path: '/market-costs', icon: ShoppingCart },
     { name: 'Deposits Ledger', path: '/deposits', icon: Wallet },
     { name: 'Monthly Reports', path: '/reports', icon: FileSpreadsheet },
+    { name: 'Mess Chat', path: '/chat', icon: MessageSquare },
   ];
 
   const navigationItems = isMember ? memberNavItems : adminNavItems;

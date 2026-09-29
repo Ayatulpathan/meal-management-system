@@ -15,6 +15,7 @@ import { MarketCosts } from '../pages/MarketCosts';
 import { Deposits } from '../pages/Deposits';
 import { Reports } from '../pages/Reports';
 import { Settings } from '../pages/Settings';
+import { Chat } from '../pages/Chat';
 
 const RootRedirect = () => {
   const { isMember } = useAuthContext();
@@ -45,6 +46,7 @@ export const AppRoutes = () => {
         <Route path="market-costs" element={<MarketCosts />} />
         <Route path="deposits" element={<Deposits />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="chat" element={<Chat />} />
         <Route
           path="settings"
           element={

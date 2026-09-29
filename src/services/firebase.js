@@ -12,6 +12,7 @@ import {
   query, 
   where, 
   orderBy, 
+  limit,
   onSnapshot,
   serverTimestamp,
   enableIndexedDbPersistence
@@ -65,6 +66,7 @@ export {
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   serverTimestamp,
   signInWithEmailAndPassword,

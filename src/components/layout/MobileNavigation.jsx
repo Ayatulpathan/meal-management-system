@@ -7,7 +7,8 @@ import {
   ShoppingCart, 
   Wallet,
   FileSpreadsheet,
-  UserCheck
+  UserCheck,
+  MessageSquare
 } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 
@@ -17,7 +18,7 @@ export const MobileNavigation = () => {
   const adminNavItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Meals', path: '/meals', icon: UtensilsCrossed },
-    { name: 'Members', path: '/members', icon: Users },
+    { name: 'Chat', path: '/chat', icon: MessageSquare },
     { name: 'Market', path: '/market-costs', icon: ShoppingCart },
     { name: 'Deposits', path: '/deposits', icon: Wallet },
     { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
@@ -26,6 +27,7 @@ export const MobileNavigation = () => {
   const memberNavItems = [
     { name: 'My Portal', path: '/portal', icon: UserCheck },
     { name: 'Meals', path: '/meals', icon: UtensilsCrossed },
+    { name: 'Chat', path: '/chat', icon: MessageSquare },
     { name: 'Market', path: '/market-costs', icon: ShoppingCart },
     { name: 'Deposits', path: '/deposits', icon: Wallet },
     { name: 'Reports', path: '/reports', icon: FileSpreadsheet },

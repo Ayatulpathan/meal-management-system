@@ -30,16 +30,19 @@ export const Deposits = () => {
   const [deletingDeposit, setDeletingDeposit] = useState(null);
 
   const handleOpenAdd = () => {
+    if (!isAdmin) return;
     setEditingDeposit(null);
     setIsFormOpen(true);
   };
 
   const handleOpenEdit = (deposit) => {
+    if (!isAdmin) return;
     setEditingDeposit(deposit);
     setIsFormOpen(true);
   };
 
   const handleFormSubmit = async (formData) => {
+    if (!isAdmin) return { success: false, error: 'Unauthorized' };
     if (editingDeposit) {
       const res = await updateDeposit(editingDeposit.id, formData);
       if (res.success) setIsFormOpen(false);
@@ -52,6 +55,7 @@ export const Deposits = () => {
   };
 
   const handleConfirmDelete = async () => {
+    if (!isAdmin) return;
     if (deletingDeposit) {
       await deleteDeposit(deletingDeposit.id);
       setDeletingDeposit(null);
@@ -86,7 +90,7 @@ export const Deposits = () => {
           <div className="bg-emerald-50 border border-emerald-200 px-4 py-1.5 rounded-xl text-xs font-bold text-emerald-800">
             Total Deposits: {formatCurrency(totalDeposits)}
           </div>
-          {!isClosed && (
+          {isAdmin && !isClosed && (
             <Button variant="primary" onClick={handleOpenAdd} icon={Plus}>
               Record Deposit
             </Button>

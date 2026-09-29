@@ -10,7 +10,8 @@ import {
   Lock, 
   Info,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { useMonthContext } from '../context/MonthContext';
@@ -22,20 +23,17 @@ import { SummaryCard } from '../components/common/SummaryCard';
 import { Button } from '../components/common/Button';
 import { Loader } from '../components/common/Loader';
 import { MarketCostForm } from '../components/market/MarketCostForm';
-import { DepositForm } from '../components/deposits/DepositForm';
 import { formatCurrency, formatBalance } from '../utils/currencyUtils';
-import { getDayList, formatDateDisplay, getTodayDayNumber } from '../utils/dateUtils';
+import { getDayList, formatDateDisplay, formatTimeDisplay, getTodayDayNumber } from '../utils/dateUtils';
 
 export const MemberPortal = () => {
   const { user, currentMemberId } = useAuthContext();
   const { selectedMonth, currentMonthData, isClosed } = useMonthContext();
   const { summary, loading: summaryLoading, raw } = useMonthlySummary();
-  const { setDayMeal, savingCell, daysCount } = useMeals();
+  const { daysCount } = useMeals();
   const { addMarketCost, actionLoading: marketActionLoading } = useMarketCosts();
-  const { addDeposit, actionLoading: depositActionLoading } = useDeposits();
 
   const [isCostModalOpen, setIsCostModalOpen] = useState(false);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('planner'); // 'planner', 'finances', 'transparency'
 
   const memberId = currentMemberId;
@@ -69,22 +67,9 @@ export const MemberPortal = () => {
     return raw.marketCosts.filter(c => c.createdBy === memberId || c.createdBy === user?.uid);
   }, [raw.marketCosts, memberId, user]);
 
-  const handleMealToggle = async (day) => {
-    if (isClosed) return;
-    const currentVal = myMealRecord.meals?.[String(day)] ?? 0;
-    const nextVal = (currentVal + 1) % 11; // 0 -> 1 -> 2 -> ... -> 10 -> 0
-    await setDayMeal(memberId, day, nextVal);
-  };
-
   const handleAddCost = async (formData) => {
     const res = await addMarketCost(formData);
     if (res.success) setIsCostModalOpen(false);
-    return res;
-  };
-
-  const handleAddDeposit = async (formData) => {
-    const res = await addDeposit({ ...formData, memberId });
-    if (res.success) setIsDepositModalOpen(false);
     return res;
   };
 
@@ -95,7 +80,7 @@ export const MemberPortal = () => {
   const isSurplus = mySummary.balance >= 0;
 
   const getMealBadgeColor = (count) => {
-    if (count === 0) return 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100';
+    if (count === 0) return 'bg-slate-50 border-slate-200 text-slate-600';
     if (count === 1) return 'bg-sky-500 border-sky-600 text-white shadow-md shadow-sky-500/20';
     if (count === 2) return 'bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-500/20';
     if (count <= 4) return 'bg-teal-600 border-teal-700 text-white shadow-md shadow-teal-600/20';
@@ -137,15 +122,6 @@ export const MemberPortal = () => {
               className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-900/40"
             >
               Add Market Expense
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setIsDepositModalOpen(true)}
-              icon={Wallet}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20 backdrop-blur"
-            >
-              Record Deposit
             </Button>
           </div>
         )}
@@ -195,7 +171,7 @@ export const MemberPortal = () => {
           }`}
         >
           <Calendar className="w-3.5 h-3.5" />
-          My Daily Meal Logger
+          My Daily Meal Attendance
         </button>
         <button
           type="button"
@@ -223,7 +199,7 @@ export const MemberPortal = () => {
         </button>
       </div>
 
-      {/* TAB 1: Member Self-Service Daily Meal Logger */}
+      {/* TAB 1: Member Daily Meal Attendance (Read-only for member) */}
       {activeTab === 'planner' && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
@@ -233,7 +209,7 @@ export const MemberPortal = () => {
                 My Daily Meal Attendance (31 Days)
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tap any day to cycle your meals: <strong>0 → 1 → 2 → 3 ... up to 10 meals/day</strong>
+                Daily meals logged & verified by the Mess Manager (0 to 10 meals/day)
               </p>
             </div>
 
@@ -246,23 +222,19 @@ export const MemberPortal = () => {
             </div>
           </div>
 
-          {/* Interactive Day-by-Day Grid */}
+          {/* Read-Only Day-by-Day Grid */}
           <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-3">
             {daysList.map((day) => {
               const val = myMealRecord.meals?.[String(day)] ?? 0;
               const isToday = day === todayDay;
-              const isSaving = savingCell === `${memberId}-${day}`;
 
               return (
-                <button
+                <div
                   key={day}
-                  type="button"
-                  onClick={() => handleMealToggle(day)}
-                  disabled={isClosed || isSaving}
-                  title={`Day ${day}: Tap to cycle (0 to 10) | Current: ${val}`}
-                  className={`p-3 rounded-2xl border text-center transition-all duration-150 transform active:scale-95 flex flex-col items-center justify-between gap-1.5 select-none ${
+                  title={`Day ${day}: ${val} meal(s) logged by admin`}
+                  className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-1.5 select-none ${
                     isToday ? 'ring-2 ring-emerald-500 ring-offset-2' : ''
-                  } ${getMealBadgeColor(val)} ${isClosed ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                  } ${getMealBadgeColor(val)}`}
                 >
                   <span className={`text-[10px] font-semibold uppercase tracking-wider block ${val > 0 ? 'text-white/80' : 'text-slate-400'}`}>
                     Day {String(day).padStart(2, '0')} {isToday ? '★' : ''}
@@ -271,7 +243,7 @@ export const MemberPortal = () => {
                   <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-md ${val > 0 ? 'bg-white/20 text-white' : 'text-slate-400'}`}>
                     {val === 0 ? 'Off' : `${val} ${val === 1 ? 'meal' : 'meals'}`}
                   </span>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -281,7 +253,7 @@ export const MemberPortal = () => {
       {/* TAB 2: Member Personal Expenses & Deposits */}
       {activeTab === 'finances' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Mess Market Costs with Purchaser Name */}
+          {/* Mess Market Costs with Purchaser Name & Time */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -306,12 +278,19 @@ export const MemberPortal = () => {
               ) : (
                 raw.marketCosts.map((c) => {
                   const isMine = c.createdBy === memberId || c.buyerName === user?.displayName;
+                  const timeStr = formatTimeDisplay(c.createdAt);
                   return (
                     <div key={c.id} className="py-3 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-slate-800">{c.description || 'Grocery purchase'}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-slate-400">{formatDateDisplay(c.date)}</span>
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                          <span className="text-xs text-slate-400 font-medium">{formatDateDisplay(c.date)}</span>
+                          {timeStr ? (
+                            <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {timeStr}
+                            </span>
+                          ) : null}
                           <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
                             By: {c.buyerName || 'Administrator'} {isMine ? '(You)' : ''}
                           </span>
@@ -325,7 +304,7 @@ export const MemberPortal = () => {
             </div>
           </div>
 
-          {/* My Deposits */}
+          {/* My Deposits (Read-only for member) */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -334,14 +313,9 @@ export const MemberPortal = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-slate-900">My Advance Deposits</h3>
-                  <p className="text-xs text-slate-500">Payments made to mess manager</p>
+                  <p className="text-xs text-slate-500">Official payments recorded by mess manager</p>
                 </div>
               </div>
-              {!isClosed && (
-                <Button size="sm" variant="outline" onClick={() => setIsDepositModalOpen(true)} icon={Plus}>
-                  Add
-                </Button>
-              )}
             </div>
 
             <div className="mt-4 divide-y divide-slate-100 max-h-72 overflow-y-auto">
@@ -440,15 +414,6 @@ export const MemberPortal = () => {
         members={raw.members}
         currentUser={user}
         loading={marketActionLoading}
-      />
-
-      {/* Add Deposit Modal */}
-      <DepositForm
-        isOpen={isDepositModalOpen}
-        onClose={() => setIsDepositModalOpen(false)}
-        onSubmit={handleAddDeposit}
-        members={raw.members.filter(m => m.id === memberId)}
-        loading={depositActionLoading}
       />
     </div>
   );

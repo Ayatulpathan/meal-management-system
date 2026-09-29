@@ -78,6 +78,31 @@ export const formatDateDisplay = (dateStr) => {
 };
 
 /**
+ * Formats a timestamp / ISO string / Firebase timestamp into time (e.g., "10:45 AM")
+ * @param {string|Date|object} timeVal 
+ * @returns {string}
+ */
+export const formatTimeDisplay = (timeVal) => {
+  if (!timeVal) return '';
+  let dateObj;
+  if (timeVal?.toDate && typeof timeVal.toDate === 'function') {
+    dateObj = timeVal.toDate();
+  } else if (timeVal?.seconds) {
+    dateObj = new Date(timeVal.seconds * 1000);
+  } else {
+    dateObj = new Date(timeVal);
+  }
+  
+  if (isNaN(dateObj.getTime())) return '';
+  
+  return dateObj.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
+/**
  * Generates recent month choices for selector
  */
 export const getRecentMonthOptions = (count = 12) => {

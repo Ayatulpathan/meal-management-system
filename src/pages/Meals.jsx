@@ -30,8 +30,8 @@ export const Meals = () => {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
 
   const handleMealChange = async (memberId, day, value) => {
-    // If not admin, verify memberId matches current user's member ID
-    if (!isAdmin && memberId !== currentMemberId) {
+    // Only admins can edit or update meals in the grid
+    if (!isAdmin) {
       return;
     }
     await setDayMeal(memberId, day, value);

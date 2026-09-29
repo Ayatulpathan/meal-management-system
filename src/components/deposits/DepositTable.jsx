@@ -24,7 +24,7 @@ export const DepositTable = ({
         icon={Wallet}
         title="No deposits recorded for this month"
         description="Record advance deposits and payments made by members."
-        actionLabel={isClosed ? null : 'Add Deposit'}
+        actionLabel={isAdmin && !isClosed ? 'Add Deposit' : null}
         onAction={onAddDeposit}
       />
     );
@@ -40,13 +40,11 @@ export const DepositTable = ({
               <th className="py-3.5 px-4">Member</th>
               <th className="py-3.5 px-4">Note / Method</th>
               <th className="py-3.5 px-4 text-right">Amount</th>
-              {!isClosed && <th className="py-3.5 px-4 sm:px-6 text-right">Actions</th>}
+              {isAdmin && !isClosed && <th className="py-3.5 px-4 sm:px-6 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {deposits.map((item) => {
-              const canEditThisDeposit = isAdmin || item.memberId === currentMemberId;
-
               return (
                 <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="py-3.5 px-4 sm:px-6 font-medium text-slate-900 whitespace-nowrap">
@@ -66,29 +64,25 @@ export const DepositTable = ({
                   <td className="py-3.5 px-4 text-right font-bold text-emerald-600 whitespace-nowrap">
                     +{formatCurrency(item.amount)}
                   </td>
-                  {!isClosed && (
+                  {isAdmin && !isClosed && (
                     <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap">
-                      {canEditThisDeposit ? (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onEdit(item)}
-                            title="Edit deposit"
-                            icon={Edit2}
-                          />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onDelete(item)}
-                            title="Delete deposit"
-                            icon={Trash2}
-                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">Protected</span>
-                      )}
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onEdit(item)}
+                          title="Edit deposit"
+                          icon={Edit2}
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onDelete(item)}
+                          title="Delete deposit"
+                          icon={Trash2}
+                          className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                        />
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -103,7 +97,7 @@ export const DepositTable = ({
               <td className="py-3.5 px-4 text-right text-base text-emerald-700 font-extrabold whitespace-nowrap">
                 {formatCurrency(totalDeposits)}
               </td>
-              {!isClosed && <td className="py-3.5 px-4 sm:px-6"></td>}
+              {isAdmin && !isClosed && <td className="py-3.5 px-4 sm:px-6"></td>}
             </tr>
           </tfoot>
         </table>

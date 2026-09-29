@@ -1,9 +1,9 @@
 import React from 'react';
-import { Edit2, Trash2, ShoppingCart } from 'lucide-react';
+import { Edit2, Trash2, ShoppingCart, Clock } from 'lucide-react';
 import { Button } from '../common/Button';
 import { EmptyState } from '../common/EmptyState';
 import { formatCurrency } from '../../utils/currencyUtils';
-import { formatDateDisplay } from '../../utils/dateUtils';
+import { formatDateDisplay, formatTimeDisplay } from '../../utils/dateUtils';
 
 export const MarketCostTable = ({
   costs = [],
@@ -35,7 +35,7 @@ export const MarketCostTable = ({
         <table className="w-full text-left text-sm text-slate-600">
           <thead className="bg-slate-50/80 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200">
             <tr>
-              <th className="py-3.5 px-4 sm:px-6">Date</th>
+              <th className="py-3.5 px-4 sm:px-6">Date & Time</th>
               <th className="py-3.5 px-4">Description / Items</th>
               <th className="py-3.5 px-4">Purchased By</th>
               <th className="py-3.5 px-4 text-right">Amount</th>
@@ -51,11 +51,20 @@ export const MarketCostTable = ({
                 item.buyerName === currentUserName
               );
               const canEditThisCost = isAdmin || isOwner;
+              const formattedTime = formatTimeDisplay(item.createdAt);
 
               return (
                 <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="py-3.5 px-4 sm:px-6 font-medium text-slate-900 whitespace-nowrap">
-                    {formatDateDisplay(item.date)}
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-slate-900">{formatDateDisplay(item.date)}</span>
+                      {formattedTime ? (
+                        <span className="text-[11px] text-slate-500 font-normal flex items-center gap-1 mt-0.5">
+                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                          {formattedTime}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="py-3.5 px-4">
                     <p className="text-slate-800 font-medium">{item.description || 'Grocery expense'}</p>

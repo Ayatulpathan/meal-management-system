@@ -23,7 +23,7 @@ export const MealRow = ({
           </div>
           <div className="truncate">
             <span className="text-xs font-semibold text-slate-800 block truncate" title={member.name}>
-              {member.name} {!canEdit ? '🔒' : ''}
+              {member.name}
             </span>
           </div>
         </div>

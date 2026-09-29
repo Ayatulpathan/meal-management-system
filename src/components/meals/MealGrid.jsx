@@ -46,9 +46,9 @@ export const MealGrid = ({
         </div>
 
         {!isAdmin && (
-          <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 font-medium">
-            <ShieldAlert className="w-3.5 h-3.5" />
-            <span>Member Mode: You can edit only your own row.</span>
+          <div className="flex items-center gap-1.5 text-slate-700 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 font-medium">
+            <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+            <span>Member View: Read-only access. Only managers/admins can record or edit meals.</span>
           </div>
         )}
 
@@ -91,7 +91,7 @@ export const MealGrid = ({
 
           <tbody className="divide-y divide-slate-100 bg-white">
             {members.map((member) => {
-              const canEdit = isAdmin || member.id === currentMemberId;
+              const canEdit = isAdmin;
               return (
                 <MealRow
                   key={member.id}

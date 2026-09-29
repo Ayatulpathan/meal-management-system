@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatCurrency } from '../../utils/currencyUtils';
-import { formatDateDisplay } from '../../utils/dateUtils';
+import { formatDateDisplay, formatTimeDisplay } from '../../utils/dateUtils';
 
 export const FinancialReport = ({ marketCosts = [], deposits = [], members = [] }) => {
   const memberMap = new Map(members.map(m => [m.id, m.name]));
@@ -24,21 +24,30 @@ export const FinancialReport = ({ marketCosts = [], deposits = [], members = [] 
           <table className="w-full text-left text-xs text-slate-600">
             <thead className="bg-slate-50 text-slate-500 uppercase border-b border-slate-200 font-semibold">
               <tr>
-                <th className="py-2.5 px-4">Date</th>
+                <th className="py-2.5 px-4">Date & Time</th>
                 <th className="py-2.5 px-3">Description</th>
+                <th className="py-2.5 px-3">Purchaser</th>
                 <th className="py-2.5 px-4 text-right">Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {marketCosts.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-4 text-center text-slate-400">No market records</td>
+                  <td colSpan={4} className="py-4 text-center text-slate-400">No market records</td>
                 </tr>
               ) : (
                 marketCosts.map((item) => (
                   <tr key={item.id}>
-                    <td className="py-2.5 px-4 whitespace-nowrap font-medium text-slate-700">{formatDateDisplay(item.date)}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap font-medium text-slate-700">
+                      <div>
+                        <span>{formatDateDisplay(item.date)}</span>
+                        {item.createdAt && (
+                          <span className="text-[10px] text-slate-400 block">{formatTimeDisplay(item.createdAt)}</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="py-2.5 px-3 text-slate-800">{item.description || 'Grocery'}</td>
+                    <td className="py-2.5 px-3 text-slate-600 font-medium">{item.buyerName || 'Admin'}</td>
                     <td className="py-2.5 px-4 text-right font-bold text-slate-900 whitespace-nowrap">{formatCurrency(item.amount)}</td>
                   </tr>
                 ))

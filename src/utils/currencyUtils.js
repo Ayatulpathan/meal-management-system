@@ -42,3 +42,16 @@ export const formatBalance = (balance) => {
   }
   return formatCurrency(0, true);
 };
+
+/**
+ * Parses user currency input string to float number
+ * @param {string|number} input
+ * @returns {number}
+ */
+export const parseAmount = (input) => {
+  if (typeof input === 'number') return isNaN(input) ? 0 : input;
+  if (!input) return 0;
+  const cleaned = String(input).replace(/[^0-9.-]+/g, '');
+  const val = parseFloat(cleaned);
+  return isNaN(val) ? 0 : val;
+};

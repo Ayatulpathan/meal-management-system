@@ -16,10 +16,12 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMonthContext } from '../../context/MonthContext';
+import { useChatContext } from '../../context/ChatContext';
 
 export const Sidebar = ({ onClose }) => {
   const { logout, user, isAdmin, isMember } = useAuthContext();
   const { isClosed, currentMonthData } = useMonthContext();
+  const { unreadCount } = useChatContext();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -79,21 +81,31 @@ export const Sidebar = ({ onClose }) => {
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navigationItems.map((item) => {
           const Icon = item.icon;
+          const isChat = item.path === '/chat';
+          const hasUnread = isChat && unreadCount > 0;
+
           return (
             <NavLink
               key={item.path}
               to={item.path}
               onClick={onClose}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                   isActive
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/20'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                 }`
               }
             >
-              <Icon className="w-4 h-4 shrink-0" />
-              <span>{item.name}</span>
+              <div className="flex items-center gap-3">
+                <Icon className="w-4 h-4 shrink-0" />
+                <span>{item.name}</span>
+              </div>
+              {hasUnread && (
+                <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </NavLink>
           );
         })}

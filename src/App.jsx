@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { MonthProvider } from './context/MonthContext';
+import { ChatProvider } from './context/ChatContext';
 import { AppRoutes } from './routes/AppRoutes';
 
 function App() {
@@ -9,7 +10,9 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <MonthProvider>
-          <AppRoutes />
+          <ChatProvider>
+            <AppRoutes />
+          </ChatProvider>
         </MonthProvider>
       </AuthProvider>
     </BrowserRouter>

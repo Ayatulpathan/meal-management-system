@@ -280,24 +280,19 @@ export const UtilityBillForm = ({
                 {activeMembers.map((member) => {
                   const isSelected = selectedMemberIds.includes(member.id);
                   return (
-                    <label
+                    <button
+                      type="button"
                       key={member.id}
                       onClick={() => handleToggleMember(member.id)}
-                      className={`flex items-center gap-2.5 p-2 rounded-xl border text-xs cursor-pointer transition-all select-none ${
+                      className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs text-left cursor-pointer transition-all ${
                         isSelected
-                          ? 'bg-primary-50/80 border-primary-300 text-primary-950 font-semibold'
-                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                          ? 'bg-emerald-50/90 border-emerald-400 text-emerald-950 font-semibold shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={isSelected}
-                        onChange={() => {}}
-                      />
-                      <div className={`p-0.5 rounded ${isSelected ? 'text-primary-600' : 'text-slate-300'}`}>
+                      <div className={`p-0.5 rounded shrink-0 ${isSelected ? 'text-emerald-600' : 'text-slate-300'}`}>
                         {isSelected ? (
-                          <CheckSquare className="w-4 h-4 fill-primary-600 text-white" />
+                          <CheckSquare className="w-4 h-4 fill-emerald-600 text-white" />
                         ) : (
                           <Square className="w-4 h-4" />
                         )}
@@ -308,7 +303,7 @@ export const UtilityBillForm = ({
                           <span className="text-[10px] text-slate-400 font-normal">Room {member.room}</span>
                         )}
                       </div>
-                    </label>
+                    </button>
                   );
                 })}
               </div>

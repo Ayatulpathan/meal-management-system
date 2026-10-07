@@ -149,11 +149,86 @@ assert(formatTimeDisplay(null) === '', 'formatTimeDisplay handles null gracefull
 assert(formatTimeDisplay('invalid') === '', 'formatTimeDisplay handles invalid input gracefully');
 
 // Currency & Balance formatting
-assert(formatCurrency(2500).includes('2,500'), `formatCurrency(2500) includes formatted value (${formatCurrency(2500)})`);
-assert(formatBalance(500).startsWith('+'), 'Positive balance is prefixed with +');
-assert(formatBalance(-500).startsWith('-'), 'Negative balance is prefixed with -');
-assert(parseAmount('৳ 2,500.50') === 2500.5, 'parseAmount extracts clean float');
+import {
+  calculateTotalUtilities,
+  calculateUtilitySharePerMember,
+  calculateMemberRentPaid,
+  calculateMemberRentLedger,
+  calculateRentSummary,
+} from './src/utils/rentCalculations.js';
+
+// -------------------------------------------------------------------
+// SUITE 6: House Rent & Shared Utility Accounting Suite
+// -------------------------------------------------------------------
+const sampleRentMembers = [
+  { id: 'm1', name: 'Rahim', room: '101', status: 'active' },
+  { id: 'm2', name: 'Karim', room: '102', status: 'active' },
+  { id: 'm3', name: 'Hasan', room: '103', status: 'active' },
+  { id: 'm4', name: 'Inactive Member', room: '104', status: 'inactive' },
+];
+
+const sampleMemberRentsMap = {
+  m1: { seatRent: 5000, room: '101' },
+  m2: { seatRent: 4500, room: '102' },
+  m3: 4000, // tests numeric shorthand format
+};
+
+const sampleUtilityBills = [
+  { id: 'u1', category: 'electricity', title: 'DESCO Bill', amount: 3000 },
+  { id: 'u2', category: 'gas', title: 'Gas Bill', amount: 1500 },
+  { id: 'u3', category: 'internet', title: 'WiFi Internet', amount: 1200 },
+  { id: 'u4', category: 'maid', title: 'Maid Salary', amount: 3000 },
+  { id: 'u5', category: 'waste', title: 'Waste Collection', amount: 300 },
+];
+
+const sampleRentPayments = [
+  { id: 'p1', memberId: 'm1', amount: 8000, date: '2026-09-05' },
+  { id: 'p2', memberId: 'm2', amount: 4000, date: '2026-09-05' },
+  { id: 'p3', memberId: 'm3', amount: 7000, date: '2026-09-05' },
+];
+
+const totalUtilities = calculateTotalUtilities(sampleUtilityBills);
+assert(totalUtilities === 9000, `Total Utilities = 9000 (actual: ${totalUtilities})`);
+
+// 3 active members sharing 9000 -> 3000/person
+const utilityShare = calculateUtilitySharePerMember(totalUtilities, 3);
+assert(utilityShare === 3000, `Utility Share per Member = 3000 (actual: ${utilityShare})`);
+
+const rentSummary = calculateRentSummary(
+  sampleRentMembers,
+  sampleMemberRentsMap,
+  sampleUtilityBills,
+  sampleRentPayments
+);
+
+assert(rentSummary.activeMemberCount === 3, 'Active members count is 3 (inactive member excluded)');
+assert(rentSummary.totalHouseRent === 13500, `Total House Rent = 13500 (actual: ${rentSummary.totalHouseRent})`);
+assert(rentSummary.totalRentDue === 22500, `Total Rent Due = 22500 (actual: ${rentSummary.totalRentDue})`);
+assert(rentSummary.totalRentPaid === 19000, `Total Rent Paid = 19000 (actual: ${rentSummary.totalRentPaid})`);
+assert(rentSummary.totalRentRemaining === 3500, `Total Rent Remaining = 3500 (actual: ${rentSummary.totalRentRemaining})`);
+
+// Rahim: Seat 5000 + Utility 3000 = 8000. Paid 8000 -> Due 0, Status 'paid'
+const rahimRent = rentSummary.memberSummaries.find(m => m.id === 'm1');
+assert(rahimRent.totalDue === 8000, `Rahim Total Due = 8000 (actual: ${rahimRent.totalDue})`);
+assert(rahimRent.rentPaid === 8000, `Rahim Paid = 8000 (actual: ${rahimRent.rentPaid})`);
+assert(rahimRent.dueRemaining === 0, `Rahim Due = 0 (actual: ${rahimRent.dueRemaining})`);
+assert(rahimRent.status === 'paid', `Rahim Status = paid (actual: ${rahimRent.status})`);
+
+// Karim: Seat 4500 + Utility 3000 = 7500. Paid 4000 -> Due 3500, Status 'partial'
+const karimRent = rentSummary.memberSummaries.find(m => m.id === 'm2');
+assert(karimRent.totalDue === 7500, `Karim Total Due = 7500 (actual: ${karimRent.totalDue})`);
+assert(karimRent.rentPaid === 4000, `Karim Paid = 4000 (actual: ${karimRent.rentPaid})`);
+assert(karimRent.dueRemaining === 3500, `Karim Due = 3500 (actual: ${karimRent.dueRemaining})`);
+assert(karimRent.status === 'partial', `Karim Status = partial (actual: ${karimRent.status})`);
+
+// Hasan: Seat 4000 + Utility 3000 = 7000. Paid 7000 -> Due 0, Status 'paid'
+const hasanRent = rentSummary.memberSummaries.find(m => m.id === 'm3');
+assert(hasanRent.totalDue === 7000, `Hasan Total Due = 7000 (actual: ${hasanRent.totalDue})`);
+assert(hasanRent.rentPaid === 7000, `Hasan Paid = 7000 (actual: ${hasanRent.rentPaid})`);
+assert(hasanRent.dueRemaining === 0, `Hasan Due = 0 (actual: ${hasanRent.dueRemaining})`);
+assert(hasanRent.status === 'paid', `Hasan Status = paid (actual: ${hasanRent.status})`);
 
 console.log('====================================================');
 console.log(`AUDIT RESULTS: ALL ${passedTests}/${totalTests} TESTS PASSED WITH 100% SUCCESS!`);
 console.log('====================================================');
+

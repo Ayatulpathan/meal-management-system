@@ -8,7 +8,8 @@ import {
   Wallet,
   FileSpreadsheet,
   UserCheck,
-  MessageSquare
+  MessageSquare,
+  Building2
 } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { useChatContext } from '../../context/ChatContext';
@@ -20,6 +21,7 @@ export const MobileNavigation = () => {
   const adminNavItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Meals', path: '/meals', icon: UtensilsCrossed },
+    { name: 'Rent', path: '/rent-utilities', icon: Building2 },
     { name: 'Chat', path: '/chat', icon: MessageSquare },
     { name: 'Market', path: '/market-costs', icon: ShoppingCart },
     { name: 'Deposits', path: '/deposits', icon: Wallet },
@@ -29,6 +31,7 @@ export const MobileNavigation = () => {
   const memberNavItems = [
     { name: 'My Portal', path: '/portal', icon: UserCheck },
     { name: 'Meals', path: '/meals', icon: UtensilsCrossed },
+    { name: 'Rent', path: '/rent-utilities', icon: Building2 },
     { name: 'Chat', path: '/chat', icon: MessageSquare },
     { name: 'Market', path: '/market-costs', icon: ShoppingCart },
     { name: 'Deposits', path: '/deposits', icon: Wallet },
@@ -38,8 +41,8 @@ export const MobileNavigation = () => {
   const mobileNavItems = isMember ? memberNavItems : adminNavItems;
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-2 py-1 shadow-lg no-print">
-      <div className="flex items-center justify-around">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-1 py-1 shadow-lg no-print">
+      <div className="flex items-center justify-between overflow-x-auto no-scrollbar">
         {mobileNavItems.map((item) => {
           const Icon = item.icon;
           const isChat = item.path === '/chat';

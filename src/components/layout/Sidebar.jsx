@@ -12,7 +12,8 @@ import {
   Sparkles,
   Lock,
   UserCheck,
-  MessageSquare
+  MessageSquare,
+  Building2
 } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMonthContext } from '../../context/MonthContext';
@@ -35,6 +36,7 @@ export const Sidebar = ({ onClose }) => {
     { name: 'Meal Entry Grid', path: '/meals', icon: UtensilsCrossed },
     { name: 'Market Cost', path: '/market-costs', icon: ShoppingCart },
     { name: 'Deposits', path: '/deposits', icon: Wallet },
+    { name: 'House Rent & Utility', path: '/rent-utilities', icon: Building2 },
     { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
     { name: 'Mess Chat', path: '/chat', icon: MessageSquare },
     { name: 'Settings', path: '/settings', icon: SettingsIcon },
@@ -45,6 +47,7 @@ export const Sidebar = ({ onClose }) => {
     { name: 'Spreadsheet Grid', path: '/meals', icon: UtensilsCrossed },
     { name: 'Market Expenses', path: '/market-costs', icon: ShoppingCart },
     { name: 'Deposits Ledger', path: '/deposits', icon: Wallet },
+    { name: 'House Rent & Utility', path: '/rent-utilities', icon: Building2 },
     { name: 'Monthly Reports', path: '/reports', icon: FileSpreadsheet },
     { name: 'Mess Chat', path: '/chat', icon: MessageSquare },
   ];

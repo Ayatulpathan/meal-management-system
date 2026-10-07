@@ -23,6 +23,18 @@ service cloud.firestore {
       match /deposits/{depositId} {
         allow read, write: if true;
       }
+
+      match /utilityBills/{billId} {
+        allow read, write: if true;
+      }
+
+      match /rentPayments/{paymentId} {
+        allow read, write: if true;
+      }
+
+      match /config/{configId} {
+        allow read, write: if true;
+      }
     }
 
     // Settings collection

@@ -77,6 +77,8 @@ export const formatDateDisplay = (dateStr) => {
   });
 };
 
+export const formatDate = formatDateDisplay;
+
 /**
  * Formats a timestamp / ISO string / Firebase timestamp into time (e.g., "10:45 AM")
  * @param {string|Date|object} timeVal 

@@ -28,7 +28,7 @@ export const authService = {
     }
 
     // Check if logging in as Default Administrator
-    if (cleanEmail === 'admin@mealmanager.com') {
+    if (cleanEmail === 'admin@messhishab.com' || cleanEmail === 'admin@mealmanager.com') {
       if (cleanPassword === 'admin123' || !isFirebaseConfigured()) {
         const adminUser = {
           uid: 'admin_001',

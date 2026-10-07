@@ -25,7 +25,7 @@ export const Settings = () => {
   const { currentMonthData, isClosed, toggleMonthStatus } = useMonthContext();
   const { user } = useAuthContext();
 
-  const [appName, setAppName] = useState('Meal Management System');
+  const [appName, setAppName] = useState('MessHishab');
   const [currency, setCurrency] = useState('BDT (৳)');
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -231,7 +231,7 @@ export const Settings = () => {
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-slate-900">Administrator (Default)</div>
-                  <div className="text-[11px] text-slate-500">admin@mealmanager.com</div>
+                  <div className="text-[11px] text-slate-500">admin@messhishab.com</div>
                 </div>
               </div>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
@@ -343,7 +343,7 @@ export const Settings = () => {
 
           <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
             <span className="font-semibold text-slate-700">Logged in Admin:</span>
-            <span className="font-medium text-slate-800">{user?.email || 'admin@mealmanager.com'}</span>
+            <span className="font-medium text-slate-800">{user?.email || 'admin@messhishab.com'}</span>
           </div>
         </div>
       </div>

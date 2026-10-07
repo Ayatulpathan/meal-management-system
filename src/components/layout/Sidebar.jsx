@@ -63,7 +63,7 @@ export const Sidebar = ({ onClose }) => {
         </div>
         <div>
           <h1 className="text-base font-extrabold text-white tracking-wide flex items-center gap-1.5">
-            MealManager
+            MessHishab
           </h1>
           <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
             <Sparkles className="w-3 h-3" /> {isMember ? 'Member Portal' : 'Admin Console'}
@@ -154,7 +154,7 @@ export const Sidebar = ({ onClose }) => {
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 truncate">
-                {user?.email || 'user@mealmanager.com'}
+                {user?.email || 'user@messhishab.com'}
               </p>
             </div>
           </div>

@@ -272,6 +272,7 @@ export const RentUtilities = () => {
       {activeTab === 'bills' && (
         <UtilityBillList
           bills={utilityBills}
+          activeMembers={activeMembers}
           activeMemberCount={summary.activeMemberCount}
           isAdmin={isAdmin}
           isClosed={isClosed}
@@ -298,6 +299,7 @@ export const RentUtilities = () => {
         onClose={() => setIsBillModalOpen(false)}
         onSubmit={handleBillSubmit}
         initialData={editingBill}
+        activeMembers={activeMembers}
         currentUser={user}
         loading={actionLoading}
       />

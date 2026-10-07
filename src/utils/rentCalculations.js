@@ -1,6 +1,7 @@
 /**
  * House Rent & Utility Calculation Engine
  * Completely isolated from meal rate and grocery accounting.
+ * Supports selective member participation for utility bills.
  */
 
 /**
@@ -14,7 +15,52 @@ export const calculateTotalUtilities = (utilityBills = []) => {
 };
 
 /**
- * Calculates individual utility share per active member
+ * Calculates individual utility share for a specific bill among its participating members
+ * @param {Object} bill 
+ * @param {Array} activeMembers 
+ * @param {Object} memberRentsMap 
+ * @returns {Object} { participatingMembersCount, perPersonShare, participatingMemberIds }
+ */
+export const calculateBillPerPersonShare = (bill, activeMembers = [], memberRentsMap = {}) => {
+  const amount = Number(bill?.amount) || 0;
+  if (amount <= 0 || !activeMembers || activeMembers.length === 0) {
+    return { participatingMembersCount: 0, perPersonShare: 0, participatingMemberIds: [] };
+  }
+
+  let participatingMemberIds = [];
+  if (Array.isArray(bill.includedMembers) && bill.includedMembers.length > 0) {
+    // If specific members are chosen for this bill, include them
+    participatingMemberIds = activeMembers
+      .filter(m => bill.includedMembers.includes(m.id))
+      .map(m => m.id);
+  } else {
+    // If general bill (all active members), exclude members configured as exemptUtilities
+    participatingMemberIds = activeMembers
+      .filter(m => {
+        const cfg = memberRentsMap?.[m.id];
+        const isExempt = cfg && typeof cfg === 'object' && cfg.exemptUtilities;
+        return !isExempt;
+      })
+      .map(m => m.id);
+    
+    // Fallback if everyone is exempt, avoid division by zero
+    if (participatingMemberIds.length === 0) {
+      participatingMemberIds = activeMembers.map(m => m.id);
+    }
+  }
+
+  const count = participatingMemberIds.length;
+  const perPersonShare = count > 0 ? Math.round((amount / count) * 100) / 100 : 0;
+
+  return {
+    participatingMembersCount: count,
+    perPersonShare,
+    participatingMemberIds,
+  };
+};
+
+/**
+ * Calculates average or global utility share per member
  * @param {number} totalUtilities 
  * @param {number} activeMembersCount 
  * @returns {number}
@@ -38,9 +84,9 @@ export const calculateMemberRentPaid = (memberId, rentPayments = []) => {
 };
 
 /**
- * Calculates individual member rent & utility statement
+ * Calculates individual member rent & utility statement with selective bill participation
  * @param {Array} members 
- * @param {Object} memberRentsMap { [memberId]: number | { seatRent: number, room: string } }
+ * @param {Object} memberRentsMap { [memberId]: number | { seatRent: number, room: string, exemptUtilities?: boolean } }
  * @param {Array} utilityBills 
  * @param {Array} rentPayments 
  * @returns {Array}
@@ -54,12 +100,17 @@ export const calculateMemberRentLedger = (
   const activeMembers = Array.isArray(members)
     ? members.filter(m => (m.status === undefined || m.status === 'active'))
     : [];
-  const totalUtilities = calculateTotalUtilities(utilityBills);
-  const utilityShare = calculateUtilitySharePerMember(totalUtilities, activeMembers.length);
+
+  // Pre-calculate per-bill shares considering exemptions
+  const billShares = utilityBills.map((bill) => ({
+    bill,
+    shareInfo: calculateBillPerPersonShare(bill, activeMembers, memberRentsMap),
+  }));
 
   return activeMembers.map((member) => {
     let seatRent = 0;
     let room = member.room || '';
+    let exemptUtilities = false;
 
     const rentConfig = memberRentsMap?.[member.id];
     if (typeof rentConfig === 'number') {
@@ -67,11 +118,29 @@ export const calculateMemberRentLedger = (
     } else if (rentConfig && typeof rentConfig === 'object') {
       seatRent = Number(rentConfig.seatRent) || 0;
       if (rentConfig.room) room = rentConfig.room;
+      if (rentConfig.exemptUtilities !== undefined) exemptUtilities = !!rentConfig.exemptUtilities;
     } else if (member.rent !== undefined || member.defaultRent !== undefined) {
       seatRent = Number(member.rent || member.defaultRent || 0);
     }
 
-    const totalPayable = Math.round((seatRent + utilityShare) * 100) / 100;
+    // Calculate this member's utility share from bills they participate in
+    let memberUtilityShare = 0;
+    const participatedBills = [];
+
+    billShares.forEach(({ bill, shareInfo }) => {
+      if (shareInfo.participatingMemberIds.includes(member.id)) {
+        memberUtilityShare += shareInfo.perPersonShare;
+        participatedBills.push({
+          billId: bill.id,
+          category: bill.category,
+          title: bill.title,
+          share: shareInfo.perPersonShare,
+        });
+      }
+    });
+
+    memberUtilityShare = Math.round(memberUtilityShare * 100) / 100;
+    const totalPayable = Math.round((seatRent + memberUtilityShare) * 100) / 100;
     const totalPaid = calculateMemberRentPaid(member.id, rentPayments);
     const balance = Math.round((totalPaid - totalPayable) * 100) / 100;
 
@@ -94,8 +163,10 @@ export const calculateMemberRentLedger = (
       memberName: member.name,
       phone: member.phone || '',
       room,
+      exemptUtilities,
       seatRent,
-      utilityShare,
+      utilityShare: memberUtilityShare,
+      participatedBills,
       totalDue: totalPayable,
       totalPayable,
       rentPaid: totalPaid,
@@ -125,21 +196,26 @@ export const calculateRentSummary = (
   const ledger = calculateMemberRentLedger(members, memberRentsMap, utilityBills, rentPayments);
   const totalUtilities = calculateTotalUtilities(utilityBills);
   const totalHouseRent = ledger.reduce((sum, m) => sum + m.seatRent, 0);
-  const totalPayableGrand = Math.round((totalHouseRent + totalUtilities) * 100) / 100;
+  const totalMemberUtilityShareSum = ledger.reduce((sum, m) => sum + m.utilityShare, 0);
+  const totalPayableGrand = Math.round((totalHouseRent + totalMemberUtilityShareSum) * 100) / 100;
+  
   const totalCollected = Array.isArray(rentPayments)
     ? rentPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
     : 0;
   
   const totalDue = ledger.reduce((sum, m) => (m.balance < 0 ? sum + Math.abs(m.balance) : sum), 0);
   const totalSurplus = ledger.reduce((sum, m) => (m.balance > 0 ? sum + m.balance : sum), 0);
-  const utilityShare = ledger.length > 0 ? ledger[0].utilityShare : 0;
+
+  const averageUtilityShare = ledger.length > 0
+    ? Math.round((totalMemberUtilityShareSum / ledger.length) * 100) / 100
+    : 0;
 
   return {
     totalMembers: ledger.length,
     activeMemberCount: ledger.length,
     totalHouseRent,
     totalUtilities,
-    utilitySharePerMember: utilityShare,
+    utilitySharePerMember: averageUtilityShare,
     totalRentDue: totalPayableGrand,
     totalPayableGrand,
     totalRentPaid: totalCollected,

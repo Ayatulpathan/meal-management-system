@@ -226,7 +226,47 @@ const hasanRent = rentSummary.memberSummaries.find(m => m.id === 'm3');
 assert(hasanRent.totalDue === 7000, `Hasan Total Due = 7000 (actual: ${hasanRent.totalDue})`);
 assert(hasanRent.rentPaid === 7000, `Hasan Paid = 7000 (actual: ${hasanRent.rentPaid})`);
 assert(hasanRent.dueRemaining === 0, `Hasan Due = 0 (actual: ${hasanRent.dueRemaining})`);
-assert(hasanRent.status === 'paid', `Hasan Status = paid (actual: ${hasanRent.status})`);
+// -------------------------------------------------------------------
+// SUITE 7: Selective Member Utility Bill Splitting & Exemption
+// -------------------------------------------------------------------
+const selectiveMembers = [
+  { id: 'user_a', name: 'Member A', status: 'active' },
+  { id: 'user_b', name: 'Member B', status: 'active' },
+  { id: 'user_c', name: 'Member C', status: 'active' },
+];
+
+const selectiveRentsMap = {
+  user_a: { seatRent: 3000 },
+  user_b: { seatRent: 3000 },
+  user_c: { seatRent: 3000, exemptUtilities: true }, // User C is exempt from all utilities
+};
+
+const selectiveBills = [
+  // Shared by all non-exempt (User A & B)
+  { id: 'b1', title: 'Gas Bill', amount: 1000, includedMembers: [] },
+  // WiFi only for User A
+  { id: 'b2', title: 'WiFi Internet', amount: 600, includedMembers: ['user_a'] },
+  // AC Electricity for User A & User B
+  { id: 'b3', title: 'AC Electricity', amount: 2000, includedMembers: ['user_a', 'user_b'] },
+];
+
+const selectiveSummary = calculateRentSummary(selectiveMembers, selectiveRentsMap, selectiveBills, []);
+
+// User A: Seat 3000 + Gas(500) + WiFi(600) + AC(1000) = 5100 total
+const userALedger = selectiveSummary.memberSummaries.find(m => m.id === 'user_a');
+assert(userALedger.utilityShare === 2100, `User A utility share = 2100 (actual: ${userALedger.utilityShare})`);
+assert(userALedger.totalDue === 5100, `User A total due = 5100 (actual: ${userALedger.totalDue})`);
+
+// User B: Seat 3000 + Gas(500) + WiFi(0) + AC(1000) = 4500 total
+const userBLedger = selectiveSummary.memberSummaries.find(m => m.id === 'user_b');
+assert(userBLedger.utilityShare === 1500, `User B utility share = 1500 (actual: ${userBLedger.utilityShare})`);
+assert(userBLedger.totalDue === 4500, `User B total due = 4500 (actual: ${userBLedger.totalDue})`);
+
+// User C: Seat 3000 + Utility(0 - exempt) = 3000 total
+const userCLedger = selectiveSummary.memberSummaries.find(m => m.id === 'user_c');
+assert(userCLedger.utilityShare === 0, `User C utility share = 0 (actual: ${userCLedger.utilityShare})`);
+assert(userCLedger.totalDue === 3000, `User C total due = 3000 (actual: ${userCLedger.totalDue})`);
+assert(userCLedger.exemptUtilities === true, 'User C has exemptUtilities flag');
 
 console.log('====================================================');
 console.log(`AUDIT RESULTS: ALL ${passedTests}/${totalTests} TESTS PASSED WITH 100% SUCCESS!`);

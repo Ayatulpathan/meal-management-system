@@ -32,6 +32,7 @@ export const createUtilityBillModel = (data = {}, user = null) => {
     date: data.date || new Date().toISOString().slice(0, 10),
     note: data.note?.trim() || '',
     paidBy: data.paidBy?.trim() || user?.displayName || 'Administrator',
+    includedMembers: Array.isArray(data.includedMembers) ? data.includedMembers : [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -46,6 +47,7 @@ export const sanitizeUtilityBill = (id, data = {}) => {
     date: data.date || '',
     note: data.note || '',
     paidBy: data.paidBy || 'Administrator',
+    includedMembers: Array.isArray(data.includedMembers) ? data.includedMembers : [],
     createdAt: data.createdAt || null,
     updatedAt: data.updatedAt || null,
   };

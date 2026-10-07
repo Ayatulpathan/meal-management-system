@@ -3,7 +3,7 @@ import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
 import { Button } from '../common/Button';
 import { CURRENCY_SYMBOL, formatCurrency } from '../../utils/currencyUtils';
-import { Building, Users, Sparkles, AlertCircle } from 'lucide-react';
+import { Building, Users, Sparkles, AlertCircle, ShieldAlert } from 'lucide-react';
 
 export const MemberRentConfigModal = ({
   isOpen,
@@ -24,6 +24,7 @@ export const MemberRentConfigModal = ({
       initialConfig[member.id] = {
         seatRent: existing?.seatRent !== undefined ? existing.seatRent : (member.rent || 0),
         room: existing?.room || member.room || '',
+        exemptUtilities: existing?.exemptUtilities || false,
       };
     });
     setRentConfig(initialConfig);
@@ -47,6 +48,16 @@ export const MemberRentConfigModal = ({
       [memberId]: {
         ...prev[memberId],
         room: value,
+      },
+    }));
+  };
+
+  const handleToggleExemptUtilities = (memberId) => {
+    setRentConfig((prev) => ({
+      ...prev,
+      [memberId]: {
+        ...prev[memberId],
+        exemptUtilities: !prev[memberId]?.exemptUtilities,
       },
     }));
   };
@@ -91,7 +102,7 @@ export const MemberRentConfigModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Configure Room & Seat Rent"
-      subtitle="Set seat/room rent for each active mess member for this month"
+      subtitle="Set seat/room rent and utility eligibility for each active mess member"
       maxWidth="max-w-2xl"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -140,15 +151,16 @@ export const MemberRentConfigModal = ({
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase tracking-wider px-2">
             <span>Member</span>
-            <div className="flex items-center gap-8">
-              <span className="w-24 text-center">Room / Seat</span>
-              <span className="w-32 text-right">Rent ({CURRENCY_SYMBOL})</span>
+            <div className="flex items-center gap-4 sm:gap-6">
+              <span className="w-20 text-center">Room</span>
+              <span className="w-28 text-right">Rent ({CURRENCY_SYMBOL})</span>
+              <span className="w-24 text-center">Utility Bill</span>
             </div>
           </div>
 
           <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto pr-1">
             {activeMembers.map((member) => {
-              const current = rentConfig[member.id] || { seatRent: 0, room: '' };
+              const current = rentConfig[member.id] || { seatRent: 0, room: '', exemptUtilities: false };
               return (
                 <div key={member.id} className="py-2.5 flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -161,10 +173,10 @@ export const MemberRentConfigModal = ({
                       placeholder="Room #"
                       value={current.room || ''}
                       onChange={(e) => handleRoomChange(member.id, e.target.value)}
-                      className="w-24 px-2.5 py-1.5 text-xs text-center border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                      className="w-20 px-2.5 py-1.5 text-xs text-center border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                     />
-                    <div className="relative w-32">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
+                    <div className="relative w-28">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
                         {CURRENCY_SYMBOL}
                       </span>
                       <input
@@ -174,9 +186,21 @@ export const MemberRentConfigModal = ({
                         value={current.seatRent === 0 ? '' : current.seatRent}
                         onChange={(e) => handleSeatRentChange(member.id, e.target.value)}
                         placeholder="0"
-                        className="w-full pl-6 pr-2.5 py-1.5 text-xs font-semibold text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-slate-800"
+                        className="w-full pl-5 pr-2 py-1.5 text-xs font-semibold text-right border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-slate-800"
                       />
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleExemptUtilities(member.id)}
+                      className={`w-24 px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all text-center ${
+                        current.exemptUtilities
+                          ? 'bg-rose-50 border-rose-200 text-rose-700'
+                          : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                      }`}
+                      title={current.exemptUtilities ? 'Exempt from all utilities' : 'Included in utility bills'}
+                    >
+                      {current.exemptUtilities ? 'Exempt' : 'Included'}
+                    </button>
                   </div>
                 </div>
               );

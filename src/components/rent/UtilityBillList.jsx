@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { formatCurrency } from '../../utils/currencyUtils';
 import { formatDate } from '../../utils/dateUtils';
+import { calculateBillPerPersonShare } from '../../utils/rentCalculations';
 import { UTILITY_CATEGORIES } from '../../models/rentUtilityModel';
 import { Button } from '../common/Button';
 import { EmptyState } from '../common/EmptyState';
@@ -17,6 +18,7 @@ import {
   Edit2,
   Trash,
   Filter,
+  Users,
 } from 'lucide-react';
 
 const CATEGORY_ICON_MAP = {
@@ -32,6 +34,7 @@ const CATEGORY_ICON_MAP = {
 
 export const UtilityBillList = ({
   bills = [],
+  activeMembers = [],
   activeMemberCount = 1,
   isAdmin = false,
   isClosed = false,
@@ -99,7 +102,8 @@ export const UtilityBillList = ({
           {filteredBills.map((bill) => {
             const config = CATEGORY_ICON_MAP[bill.category] || CATEGORY_ICON_MAP.other;
             const IconComponent = config.icon;
-            const perPersonShare = activeMemberCount > 0 ? (bill.amount / activeMemberCount) : 0;
+            const shareInfo = calculateBillPerPersonShare(bill, activeMembers);
+            const hasCustomSplit = Array.isArray(bill.includedMembers) && bill.includedMembers.length > 0;
 
             return (
               <div
@@ -118,6 +122,16 @@ export const UtilityBillList = ({
                       <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 capitalize">
                         {bill.category}
                       </span>
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                        hasCustomSplit
+                          ? 'bg-primary-50 text-primary-700 border border-primary-200'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <Users className="w-3 h-3" />
+                        {hasCustomSplit
+                          ? `${shareInfo.participatingMembersCount} selected members`
+                          : `All ${activeMembers.length || activeMemberCount} members`}
+                      </span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-slate-400 mt-1 flex-wrap">
                       <span>Date: {formatDate(bill.date)}</span>
@@ -133,7 +147,7 @@ export const UtilityBillList = ({
                       {formatCurrency(bill.amount)}
                     </p>
                     <p className="text-[11px] text-amber-700 font-medium">
-                      {formatCurrency(perPersonShare)} / person
+                      {formatCurrency(shareInfo.perPersonShare)} / person
                     </p>
                   </div>
 
@@ -165,7 +179,7 @@ export const UtilityBillList = ({
           <EmptyState
             icon={Receipt}
             title="No utility bills recorded"
-            message="Record electricity, gas, water, internet, or maid expenses to split equally among members."
+            message="Record electricity, gas, water, internet, or maid expenses and choose which members participate."
             action={
               isAdmin && !isClosed ? (
                 <Button variant="primary" size="sm" onClick={onAddBill}>

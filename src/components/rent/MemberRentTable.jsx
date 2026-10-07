@@ -65,7 +65,7 @@ export const MemberRentTable = ({
             Member Rent & Utility Ledger
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Individual seat rent + equal utility split ({formatCurrency(utilitySharePerMember)}/member)
+            Individual seat rent + assigned utility shares for each member
           </p>
         </div>
 
@@ -140,7 +140,13 @@ export const MemberRentTable = ({
                       {formatCurrency(member.seatRent)}
                     </td>
                     <td className="py-3 px-4 text-right font-medium text-amber-700">
-                      {formatCurrency(member.utilityShare)}
+                      {member.exemptUtilities ? (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">
+                          Exempt
+                        </span>
+                      ) : (
+                        formatCurrency(member.utilityShare)
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right font-bold text-slate-900">
                       {formatCurrency(member.totalDue)}

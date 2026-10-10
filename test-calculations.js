@@ -268,6 +268,57 @@ assert(userCLedger.utilityShare === 0, `User C utility share = 0 (actual: ${user
 assert(userCLedger.totalDue === 3000, `User C total due = 3000 (actual: ${userCLedger.totalDue})`);
 assert(userCLedger.exemptUtilities === true, 'User C has exemptUtilities flag');
 
+// -------------------------------------------------------------------
+// SUITE 8: Extra Money & Refund Calculation for House Rent & Utility
+// -------------------------------------------------------------------
+const extraPaymentMembers = [
+  { id: 'em1', name: 'Member Extra 1', status: 'active' },
+  { id: 'em2', name: 'Member Exact 2', status: 'active' },
+  { id: 'em3', name: 'Member Due 3', status: 'active' },
+];
+
+const extraRentsMap = {
+  em1: { seatRent: 4000 },
+  em2: { seatRent: 4000 },
+  em3: { seatRent: 4000 },
+};
+
+const extraBills = [
+  { id: 'eb1', title: 'Electricity', amount: 3000 }, // 1000 each -> Total Due = 5000 each
+];
+
+const extraPayments = [
+  { id: 'ep1', memberId: 'em1', amount: 6500, date: '2026-10-01' }, // Paid 6500 vs 5000 -> Extra 1500
+  { id: 'ep2', memberId: 'em2', amount: 5000, date: '2026-10-01' }, // Paid 5000 vs 5000 -> Exact 0
+  { id: 'ep3', memberId: 'em3', amount: 3500, date: '2026-10-01' }, // Paid 3500 vs 5000 -> Due 1500
+];
+
+const extraSummary = calculateRentSummary(extraPaymentMembers, extraRentsMap, extraBills, extraPayments);
+
+const em1 = extraSummary.memberSummaries.find(m => m.id === 'em1');
+assert(em1.totalDue === 5000, `Member Extra 1 Total Due = 5000 (actual: ${em1.totalDue})`);
+assert(em1.rentPaid === 6500, `Member Extra 1 Paid = 6500 (actual: ${em1.rentPaid})`);
+assert(em1.extraAmount === 1500, `Member Extra 1 Extra Amount = 1500 (actual: ${em1.extraAmount})`);
+assert(em1.refundableAmount === 1500, `Member Extra 1 Refundable Amount = 1500 (actual: ${em1.refundableAmount})`);
+assert(em1.willReceiveAmount === 1500, `Member Extra 1 Will Receive Amount = 1500 (actual: ${em1.willReceiveAmount})`);
+assert(em1.hasExtraPayment === true, 'Member Extra 1 has hasExtraPayment = true');
+assert(em1.dueRemaining === 0, `Member Extra 1 Due Remaining = 0 (actual: ${em1.dueRemaining})`);
+assert(em1.status === 'overpaid', `Member Extra 1 status = overpaid (actual: ${em1.status})`);
+
+const em2 = extraSummary.memberSummaries.find(m => m.id === 'em2');
+assert(em2.extraAmount === 0, `Member Exact 2 Extra Amount = 0 (actual: ${em2.extraAmount})`);
+assert(em2.dueRemaining === 0, `Member Exact 2 Due Remaining = 0 (actual: ${em2.dueRemaining})`);
+assert(em2.status === 'paid', `Member Exact 2 status = paid (actual: ${em2.status})`);
+
+const em3 = extraSummary.memberSummaries.find(m => m.id === 'em3');
+assert(em3.extraAmount === 0, `Member Due 3 Extra Amount = 0 (actual: ${em3.extraAmount})`);
+assert(em3.dueRemaining === 1500, `Member Due 3 Due Remaining = 1500 (actual: ${em3.dueRemaining})`);
+assert(em3.status === 'partial', `Member Due 3 status = partial (actual: ${em3.status})`);
+
+assert(extraSummary.totalExtraToRefund === 1500, `Total Extra To Refund = 1500 (actual: ${extraSummary.totalExtraToRefund})`);
+assert(extraSummary.membersWithExtraCount === 1, `Members With Extra Count = 1 (actual: ${extraSummary.membersWithExtraCount})`);
+assert(extraSummary.totalDue === 1500, `Total Due Remaining = 1500 (actual: ${extraSummary.totalDue})`);
+
 console.log('====================================================');
 console.log(`AUDIT RESULTS: ALL ${passedTests}/${totalTests} TESTS PASSED WITH 100% SUCCESS!`);
 console.log('====================================================');

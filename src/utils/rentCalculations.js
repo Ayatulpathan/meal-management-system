@@ -155,6 +155,10 @@ export const calculateMemberRentLedger = (
 
     const dueRemaining = balance < 0 ? Math.abs(balance) : 0;
     const advanceAmount = balance > 0 ? balance : 0;
+    const extraAmount = advanceAmount;
+    const refundableAmount = extraAmount; // Amount the member will get back
+    const willReceiveAmount = extraAmount;
+    const hasExtraPayment = balance > 0;
 
     return {
       id: member.id,
@@ -174,6 +178,10 @@ export const calculateMemberRentLedger = (
       balance,
       dueRemaining,
       advanceAmount,
+      extraAmount,
+      refundableAmount,
+      willReceiveAmount,
+      hasExtraPayment,
       status,
     };
   });
@@ -205,6 +213,8 @@ export const calculateRentSummary = (
   
   const totalDue = ledger.reduce((sum, m) => (m.balance < 0 ? sum + Math.abs(m.balance) : sum), 0);
   const totalSurplus = ledger.reduce((sum, m) => (m.balance > 0 ? sum + m.balance : sum), 0);
+  const totalExtraToRefund = Math.round(totalSurplus * 100) / 100;
+  const membersWithExtra = ledger.filter(m => m.balance > 0);
 
   const averageUtilityShare = ledger.length > 0
     ? Math.round((totalMemberUtilityShareSum / ledger.length) * 100) / 100
@@ -222,7 +232,10 @@ export const calculateRentSummary = (
     totalCollected,
     totalRentRemaining: Math.round(totalDue * 100) / 100,
     totalDue: Math.round(totalDue * 100) / 100,
-    totalSurplus: Math.round(totalSurplus * 100) / 100,
+    totalSurplus: totalExtraToRefund,
+    totalExtraToRefund,
+    membersWithExtraCount: membersWithExtra.length,
+    membersWithExtra,
     memberSummaries: ledger,
     ledger,
   };

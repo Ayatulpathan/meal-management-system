@@ -310,6 +310,7 @@ export const RentUtilities = () => {
         onSubmit={handlePaymentSubmit}
         initialData={editingPayment}
         activeMembers={activeMembers}
+        memberSummaries={summary?.memberSummaries || []}
         currentUser={user}
         loading={actionLoading}
       />

@@ -50,6 +50,14 @@ export const SummaryCard = ({
       titleColor: 'text-slate-500',
       subtitleColor: 'text-slate-400',
     },
+    success: {
+      bg: 'bg-white',
+      border: 'border-emerald-200 hover:border-emerald-300',
+      iconBg: 'bg-emerald-50 text-emerald-600 border border-emerald-100',
+      valueColor: 'text-emerald-700 font-extrabold',
+      titleColor: 'text-slate-500',
+      subtitleColor: 'text-emerald-700/90 font-medium',
+    },
   };
 
   const style = variantMap[variant] || variantMap.default;

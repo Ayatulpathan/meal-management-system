@@ -340,15 +340,22 @@ assert(testScheduleModel.status === 'pending', 'Schedule model default status is
 assert(testScheduleModel.estimatedBudget === 3500, 'Schedule model budget parsed as 3500');
 assert(testScheduleModel.autoNotified === false, 'Schedule model autoNotified defaults to false');
 assert(testScheduleModel.notificationStatus === 'none', 'Schedule model notificationStatus defaults to none');
+assert(testScheduleModel.autoEmailSent === false, 'Schedule model autoEmailSent defaults to false');
+assert(testScheduleModel.emailStatus === 'none', 'Schedule model emailStatus defaults to none');
 
 const sanitizedSchedule = sanitizeBazarSchedule('sch_test_01', {
   ...testScheduleModel,
   autoNotified: true,
   autoNotifiedAt: '2026-10-30T07:00:00Z',
   notificationStatus: 'sent',
+  autoEmailSent: true,
+  autoEmailSentAt: '2026-10-30T07:00:00Z',
+  emailStatus: 'sent',
 });
 assert(sanitizedSchedule.autoNotified === true, 'Sanitizer preserves autoNotified true');
 assert(sanitizedSchedule.notificationStatus === 'sent', 'Sanitizer preserves notificationStatus sent');
+assert(sanitizedSchedule.autoEmailSent === true, 'Sanitizer preserves autoEmailSent true');
+assert(sanitizedSchedule.emailStatus === 'sent', 'Sanitizer preserves emailStatus sent');
 
 // Phone Sanitizer for BD (+880) WhatsApp Links
 assert(sanitizeBDPhoneNumber('01712345678') === '8801712345678', 'BD 11-digit phone sanitizes to 8801712345678');

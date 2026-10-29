@@ -27,6 +27,7 @@ import { memberService } from '../services/memberService';
 import { authService } from '../services/authService';
 import { isFirebaseConfigured } from '../services/firebase';
 import { whatsappAutoService, WHATSAPP_PROVIDERS } from '../services/whatsappAutoService';
+import { emailAutoService, EMAIL_PROVIDERS } from '../services/emailAutoService';
 
 export const Settings = () => {
   const { currentMonthData, isClosed, toggleMonthStatus } = useMonthContext();
@@ -66,6 +67,25 @@ export const Settings = () => {
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
+  // Email Automation state
+  const [emailConfig, setEmailConfig] = useState({
+    enabled: true,
+    provider: EMAIL_PROVIDERS.GMAIL_SMTP,
+    senderEmail: 'messhishab@gmail.com',
+    senderName: 'MessHishab Manager',
+    gmailAppPassword: '',
+    resendApiKey: '',
+    brevoApiKey: '',
+    testEmail: '',
+    notifyTime: '07:00',
+  });
+  const [isSavingEmail, setIsSavingEmail] = useState(false);
+  const [emailSaveSuccess, setEmailSaveSuccess] = useState('');
+  const [emailSaveError, setEmailSaveError] = useState('');
+  const [testEmailRecipient, setTestEmailRecipient] = useState('');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState(null);
+
   const fetchAdmins = async () => {
     try {
       const allMembers = await memberService.getMembers();
@@ -86,9 +106,21 @@ export const Settings = () => {
     }
   };
 
+  const fetchEmailConfig = async () => {
+    try {
+      const cfg = await emailAutoService.getConfig();
+      setEmailConfig(cfg);
+      if (cfg.testEmail) setTestEmailRecipient(cfg.testEmail);
+      else if (user?.email) setTestEmailRecipient(user.email);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchAdmins();
     fetchWaConfig();
+    fetchEmailConfig();
   }, []);
 
   const handleSaveWaConfig = async (e) => {
@@ -141,6 +173,59 @@ export const Settings = () => {
       setTestResult({ success: false, message: err.message });
     } finally {
       setIsSendingTest(false);
+    }
+  };
+
+  const handleSaveEmailConfig = async (e) => {
+    e.preventDefault();
+    setIsSavingEmail(true);
+    setEmailSaveSuccess('');
+    setEmailSaveError('');
+    try {
+      const res = await emailAutoService.saveConfig({
+        ...emailConfig,
+        testEmail: testEmailRecipient,
+      });
+      if (res.success) {
+        setEmailSaveSuccess('Automated Email settings updated and saved successfully!');
+        setTimeout(() => setEmailSaveSuccess(''), 4000);
+      } else {
+        setEmailSaveError(res.error || 'Failed to save email settings.');
+      }
+    } catch (err) {
+      setEmailSaveError(err.message);
+    } finally {
+      setIsSavingEmail(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailRecipient.trim() || !testEmailRecipient.includes('@')) {
+      setTestEmailResult({ success: false, message: 'Please enter a valid recipient email address.' });
+      return;
+    }
+    setIsSendingTestEmail(true);
+    setTestEmailResult(null);
+    try {
+      const res = await emailAutoService.sendTestEmail(testEmailRecipient, {
+        ...emailConfig,
+        testEmail: testEmailRecipient,
+      });
+      if (res.success) {
+        setTestEmailResult({
+          success: true,
+          message: `✓ Test alert email sent successfully to ${testEmailRecipient}! Please check your inbox or spam folder.`,
+        });
+      } else {
+        setTestEmailResult({
+          success: false,
+          message: `Dispatch failed: ${res.error || 'Check email configuration and credentials.'}`,
+        });
+      }
+    } catch (err) {
+      setTestEmailResult({ success: false, message: err.message });
+    } finally {
+      setIsSendingTestEmail(false);
     }
   };
 
@@ -380,6 +465,239 @@ export const Settings = () => {
         <p className="text-xs text-slate-600 mt-4 leading-relaxed">
           Closing a month locks all daily meal entries, grocery costs, and deposit transactions from accidental modifications. The generated financial report remains permanently accessible.
         </p>
+      </div>
+
+      {/* Automated Email & Gmail Alerts Section */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
+              <Mail className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">
+                  Automated Email & Gmail Alerts (স্বয়ংক্রিয় ইমেইল নোটিফিকেশন)
+                </h3>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  emailConfig.enabled
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {emailConfig.enabled ? '● Active (100% Free)' : '○ Disabled'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Automatically deliver daily bazar duty notifications to members' Gmail inboxes at 7:00 AM (100% Free & Autonomous)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {emailSaveSuccess && (
+          <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{emailSaveSuccess}</span>
+          </div>
+        )}
+
+        {emailSaveError && (
+          <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{emailSaveError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveEmailConfig} className="mt-5 space-y-5">
+          {/* Main Activation Toggle */}
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <div>
+              <label className="text-xs font-bold text-slate-900 block cursor-pointer">
+                Enable Daily Automatic Email Alerts (স্বয়ংক্রিয় ইমেইল অ্যালার্ট চালু করুন)
+              </label>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                The 24/7 cloud runner sends an email notice to the duty member's Gmail every morning.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={emailConfig.enabled}
+                onChange={(e) => setEmailConfig({ ...emailConfig, enabled: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+
+          {/* Email Provider Selection */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700">
+              Email Dispatcher Provider (ইমেইল সার্ভিস গেটওয়ে)
+            </label>
+            <select
+              value={emailConfig.provider}
+              onChange={(e) => setEmailConfig({ ...emailConfig, provider: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+            >
+              <option value={EMAIL_PROVIDERS.GMAIL_SMTP}>Gmail SMTP (Free via Google App Password - 500 emails/day)</option>
+              <option value={EMAIL_PROVIDERS.RESEND}>Resend API (100% Free - 3,000 emails/month)</option>
+              <option value={EMAIL_PROVIDERS.BREVO}>Brevo API (100% Free - 300 emails/day)</option>
+              <option value={EMAIL_PROVIDERS.SIMULATION}>Simulation Mode (Log test alerts without sending)</option>
+            </select>
+          </div>
+
+          {/* Gmail SMTP Fields */}
+          {emailConfig.provider === EMAIL_PROVIDERS.GMAIL_SMTP && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Sender Gmail Address"
+                  placeholder="e.g. yourmess@gmail.com"
+                  value={emailConfig.senderEmail}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, senderEmail: e.target.value })}
+                  prefix={<Mail className="w-4 h-4 text-slate-400" />}
+                />
+                <Input
+                  label="Sender Display Name"
+                  placeholder="e.g. MessHishab Manager"
+                  value={emailConfig.senderName}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, senderName: e.target.value })}
+                  prefix={<User className="w-4 h-4 text-slate-400" />}
+                />
+              </div>
+
+              <Input
+                label="Google App Password (16 letters)"
+                type="password"
+                placeholder="abcd efgh ijkl mnop"
+                value={emailConfig.gmailAppPassword}
+                onChange={(e) => setEmailConfig({ ...emailConfig, gmailAppPassword: e.target.value })}
+                helperText="Use a Google App Password (not your regular Gmail login password)"
+                prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
+              />
+
+              <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-100 text-xs text-blue-950 space-y-2">
+                <p className="font-bold flex items-center gap-1.5 text-blue-900">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  How to generate your free Google App Password in 1 minute:
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-blue-800">
+                  <li>Go to your Google Security settings: <strong>myaccount.google.com/security</strong></li>
+                  <li>Ensure <strong>2-Step Verification</strong> is enabled.</li>
+                  <li>Go to <strong>myaccount.google.com/apppasswords</strong></li>
+                  <li>Enter App Name: <strong>MessHishab</strong> and click <strong>Create</strong>.</li>
+                  <li>Google will give you a 16-letter password (e.g. <code>abcd efgh ijkl mnop</code>). Paste it into the box above and save!</li>
+                </ol>
+              </div>
+            </div>
+          )}
+
+          {/* Resend Fields */}
+          {emailConfig.provider === EMAIL_PROVIDERS.RESEND && (
+            <Input
+              label="Resend API Key"
+              placeholder="re_123456789..."
+              value={emailConfig.resendApiKey}
+              onChange={(e) => setEmailConfig({ ...emailConfig, resendApiKey: e.target.value })}
+              helperText="Free 3,000 emails/month from resend.com"
+              prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
+            />
+          )}
+
+          {/* Brevo Fields */}
+          {emailConfig.provider === EMAIL_PROVIDERS.BREVO && (
+            <Input
+              label="Brevo (Sendinblue) API Key"
+              placeholder="xkeysib-..."
+              value={emailConfig.brevoApiKey}
+              onChange={(e) => setEmailConfig({ ...emailConfig, brevoApiKey: e.target.value })}
+              helperText="Free 300 emails/day from brevo.com"
+              prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
+            />
+          )}
+
+          {/* Timing Section */}
+          <div className="pt-2 border-t border-slate-100 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="text-xs font-bold text-slate-800 block">
+                  Daily Automatic Email Dispatch Time:
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  The cloud runner dispatches duty emails at this time every morning.
+                </p>
+              </div>
+              <input
+                type="time"
+                value={emailConfig.notifyTime || '07:00'}
+                onChange={(e) => setEmailConfig({ ...emailConfig, notifyTime: e.target.value })}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end pt-2">
+            <Button
+              type="submit"
+              variant="primary"
+              loading={isSavingEmail}
+              icon={CheckCircle2}
+            >
+              Save Email Automation Settings
+            </Button>
+          </div>
+        </form>
+
+        {/* Live Test Email Connection Box */}
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Send className="w-3.5 h-3.5 text-blue-600" />
+            Test Email Alert Connection (টেস্ট ইমেইল পাঠান)
+          </h4>
+          <p className="text-xs text-slate-500 mb-3">
+            Send a sample bazar duty email to your personal inbox right now to verify the look and feel.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="w-full sm:flex-1">
+              <Input
+                placeholder="Enter recipient email (e.g. you@gmail.com)"
+                type="email"
+                value={testEmailRecipient}
+                onChange={(e) => setTestEmailRecipient(e.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={isSendingTestEmail}
+              onClick={handleSendTestEmail}
+              icon={Send}
+              className="w-full sm:w-auto"
+            >
+              Send Test Email
+            </Button>
+          </div>
+
+          {testEmailResult && (
+            <div
+              className={`mt-3 p-3 rounded-xl text-xs flex items-center gap-2 ${
+                testEmailResult.success
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                  : 'bg-rose-50 border border-rose-200 text-rose-700'
+              }`}
+            >
+              {testEmailResult.success ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0" />
+              )}
+              <span>{testEmailResult.message}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* WhatsApp Automation Gateway Section */}

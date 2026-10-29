@@ -29,4 +29,13 @@ jobs:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY || 'AIzaSyDcvOWmVDpn1VX2FWnmPU1NyqhrhGTviZQ' }}
           VITE_FIREBASE_PROJECT_ID: 'khadok-meal'
           CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
-        run: node scripts/cron-whatsapp-duty.mjs
+        run: node scripts/cron-whatsapp-duty.mjs || true
+
+      - name: Execute Daily Automated Email & Gmail Bazar Dispatcher
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY || 'AIzaSyDcvOWmVDpn1VX2FWnmPU1NyqhrhGTviZQ' }}
+          VITE_FIREBASE_PROJECT_ID: 'khadok-meal'
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: node scripts/cron-email-duty.mjs

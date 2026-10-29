@@ -20,6 +20,9 @@ export const createBazarScheduleModel = (data = {}) => {
     estimatedBudget: Number(data.estimatedBudget) || 0,
     status: data.status || BAZAR_DUTY_STATUS.PENDING,
     assignedBy: data.assignedBy || 'Administrator',
+    autoNotified: Boolean(data.autoNotified) || false,
+    autoNotifiedAt: data.autoNotifiedAt || null,
+    notificationStatus: data.notificationStatus || 'none',
     createdAt: data.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -37,6 +40,9 @@ export const sanitizeBazarSchedule = (id, data = {}) => {
     estimatedBudget: Number(data.estimatedBudget) || 0,
     status: data.status || BAZAR_DUTY_STATUS.PENDING,
     assignedBy: data.assignedBy || 'Administrator',
+    autoNotified: Boolean(data.autoNotified) || false,
+    autoNotifiedAt: data.autoNotifiedAt || null,
+    notificationStatus: data.notificationStatus || 'none',
     createdAt: data.createdAt || new Date().toISOString(),
     updatedAt: data.updatedAt || new Date().toISOString(),
   };

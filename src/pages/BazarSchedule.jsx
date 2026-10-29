@@ -33,6 +33,7 @@ export const BazarSchedule = () => {
     activeMembers,
     loading,
     actionLoading,
+    autoDispatchStatus,
     addSchedule,
     updateSchedule,
     deleteSchedule,
@@ -153,6 +154,14 @@ export const BazarSchedule = () => {
           )}
         </div>
       </div>
+
+      {/* Auto Dispatch Status Alert */}
+      {autoDispatchStatus && (
+        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2 shadow-xs animate-fadeIn">
+          <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span><strong>Automatic WhatsApp Alert:</strong> {autoDispatchStatus}</span>
+        </div>
+      )}
 
       {/* Today's Duty Hero Banner */}
       <BazarTodayAlert

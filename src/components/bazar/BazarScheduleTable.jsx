@@ -190,29 +190,41 @@ export const BazarScheduleTable = ({
 
                     {/* WhatsApp Notification Action */}
                     <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => onNotifyWhatsApp(item)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366] hover:text-white transition-all shadow-2xs border border-[#25D366]/30 group"
-                          title="Send pre-filled message via WhatsApp"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          <span>WhatsApp</span>
-                        </button>
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onNotifyWhatsApp(item)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366] hover:text-white transition-all shadow-2xs border border-[#25D366]/30 group"
+                            title="Send pre-filled message via WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>WhatsApp</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(item)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                          title="Copy notification text"
-                        >
-                          {copiedId === item.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(item)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                            title="Copy notification text"
+                          >
+                            {copiedId === item.id ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+
+                        {item.autoNotified && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200"
+                            title={item.autoNotifiedAt ? `Auto-notified at ${new Date(item.autoNotifiedAt).toLocaleTimeString()}` : 'Auto-notified'}
+                          >
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                            Auto-Sent
+                          </span>
+                        )}
                       </div>
                     </td>
 

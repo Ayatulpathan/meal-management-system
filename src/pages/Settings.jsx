@@ -11,7 +11,13 @@ import {
   Mail,
   User,
   Shield,
-  AlertCircle
+  AlertCircle,
+  MessageSquare,
+  Send,
+  Zap,
+  Info,
+  ExternalLink,
+  Sparkles
 } from 'lucide-react';
 import { useMonthContext } from '../context/MonthContext';
 import { useAuthContext } from '../context/AuthContext';
@@ -20,6 +26,7 @@ import { Input } from '../components/common/Input';
 import { memberService } from '../services/memberService';
 import { authService } from '../services/authService';
 import { isFirebaseConfigured } from '../services/firebase';
+import { whatsappAutoService, WHATSAPP_PROVIDERS } from '../services/whatsappAutoService';
 
 export const Settings = () => {
   const { currentMonthData, isClosed, toggleMonthStatus } = useMonthContext();
@@ -39,6 +46,26 @@ export const Settings = () => {
   const [adminSuccess, setAdminSuccess] = useState('');
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
+  // WhatsApp Automation state
+  const [waConfig, setWaConfig] = useState({
+    enabled: false,
+    provider: WHATSAPP_PROVIDERS.CALLMEBOT,
+    apiKey: '',
+    instanceId: '',
+    token: '',
+    webhookUrl: '',
+    testPhone: '',
+    autoDispatchOnDutyDay: true,
+    notifyTime: '07:00',
+    sendAdvanceNoticeEveningBefore: false,
+  });
+  const [isSavingWa, setIsSavingWa] = useState(false);
+  const [waSaveSuccess, setWaSaveSuccess] = useState('');
+  const [waSaveError, setWaSaveError] = useState('');
+  const [testPhone, setTestPhone] = useState('');
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+
   const fetchAdmins = async () => {
     try {
       const allMembers = await memberService.getMembers();
@@ -49,9 +76,73 @@ export const Settings = () => {
     }
   };
 
+  const fetchWaConfig = async () => {
+    try {
+      const cfg = await whatsappAutoService.getConfig();
+      setWaConfig(cfg);
+      if (cfg.testPhone) setTestPhone(cfg.testPhone);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchAdmins();
+    fetchWaConfig();
   }, []);
+
+  const handleSaveWaConfig = async (e) => {
+    e.preventDefault();
+    setIsSavingWa(true);
+    setWaSaveSuccess('');
+    setWaSaveError('');
+    try {
+      const res = await whatsappAutoService.saveConfig({
+        ...waConfig,
+        testPhone,
+      });
+      if (res.success) {
+        setWaSaveSuccess('WhatsApp Automation settings updated and saved successfully!');
+        setTimeout(() => setWaSaveSuccess(''), 4000);
+      } else {
+        setWaSaveError(res.error || 'Failed to save settings.');
+      }
+    } catch (err) {
+      setWaSaveError(err.message);
+    } finally {
+      setIsSavingWa(false);
+    }
+  };
+
+  const handleSendTestMessage = async () => {
+    if (!testPhone.trim()) {
+      setTestResult({ success: false, message: 'Please enter a test phone number with WhatsApp.' });
+      return;
+    }
+    setIsSendingTest(true);
+    setTestResult(null);
+    try {
+      const res = await whatsappAutoService.sendTestMessage(testPhone, {
+        ...waConfig,
+        testPhone,
+      });
+      if (res.success) {
+        setTestResult({
+          success: true,
+          message: '✓ Test WhatsApp alert dispatched successfully! Please check the recipient phone.',
+        });
+      } else {
+        setTestResult({
+          success: false,
+          message: `Dispatch failed: ${res.error || 'Unknown error. Check provider credentials.'}`,
+        });
+      }
+    } catch (err) {
+      setTestResult({ success: false, message: err.message });
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
 
   const handleSaveSettings = (e) => {
     e.preventDefault();
@@ -289,6 +380,254 @@ export const Settings = () => {
         <p className="text-xs text-slate-600 mt-4 leading-relaxed">
           Closing a month locks all daily meal entries, grocery costs, and deposit transactions from accidental modifications. The generated financial report remains permanently accessible.
         </p>
+      </div>
+
+      {/* WhatsApp Automation Gateway Section */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+              <MessageSquare className="w-5 h-5 text-[#25D366]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">
+                  WhatsApp Automation Gateway (হোয়াটসঅ্যাপ স্বয়ংক্রিয় নোটিফিকেশন)
+                </h3>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  waConfig.enabled
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {waConfig.enabled ? '● Active' : '○ Disabled'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Automatically send bazar duty notices to members' WhatsApp numbers without manual typing
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {waSaveSuccess && (
+          <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{waSaveSuccess}</span>
+          </div>
+        )}
+
+        {waSaveError && (
+          <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{waSaveError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveWaConfig} className="mt-5 space-y-5">
+          {/* Main Activation Toggle */}
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <div>
+              <label className="text-xs font-bold text-slate-900 block cursor-pointer">
+                Enable Automatic WhatsApp Alerts (স্বয়ংক্রিয় অ্যালার্ট চালু করুন)
+              </label>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                When enabled, the system automatically dispatches bazar duty notices on the duty date.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={waConfig.enabled}
+                onChange={(e) => setWaConfig({ ...waConfig, enabled: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#25D366]"></div>
+            </label>
+          </div>
+
+          {/* Provider Selection */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700">
+              WhatsApp Gateway Provider (গেটওয়ে সার্ভিস)
+            </label>
+            <select
+              value={waConfig.provider}
+              onChange={(e) => setWaConfig({ ...waConfig, provider: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+            >
+              <option value={WHATSAPP_PROVIDERS.CALLMEBOT}>CallMeBot (Free WhatsApp Bot - Recommended for Personal & Mess)</option>
+              <option value={WHATSAPP_PROVIDERS.ULTRAMSG}>UltraMsg (API Gateway)</option>
+              <option value={WHATSAPP_PROVIDERS.GREENAPI}>Green API (Cloud Gateway)</option>
+              <option value={WHATSAPP_PROVIDERS.CUSTOM_WEBHOOK}>Custom Webhook (Zapier / Make / n8n / Custom Node Server)</option>
+              <option value={WHATSAPP_PROVIDERS.SIMULATION}>Simulation Mode (Test & log messages without gateway)</option>
+            </select>
+          </div>
+
+          {/* Dynamic Provider Fields */}
+          {waConfig.provider === WHATSAPP_PROVIDERS.CALLMEBOT && (
+            <div className="space-y-4">
+              <Input
+                label="CallMeBot API Key"
+                placeholder="e.g. 123456"
+                value={waConfig.apiKey}
+                onChange={(e) => setWaConfig({ ...waConfig, apiKey: e.target.value })}
+                helperText="Enter your free CallMeBot API Key"
+                prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
+              />
+
+              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-100 text-xs text-emerald-950 space-y-2">
+                <p className="font-bold flex items-center gap-1.5 text-emerald-900">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  How to get your free CallMeBot API Key in 30 seconds:
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-emerald-800">
+                  <li>Save the CallMeBot number <strong>+34 644 44 44 44</strong> or <strong>+34 911 06 14 06</strong> in your phone contacts.</li>
+                  <li>Send this exact WhatsApp message to that number: <code>I allow callmebot to send me messages</code></li>
+                  <li>CallMeBot will immediately reply with your free personal <strong>API Key</strong>.</li>
+                  <li>Paste that API Key into the field above and click <strong>Save Settings</strong>.</li>
+                </ol>
+              </div>
+            </div>
+          )}
+
+          {waConfig.provider === WHATSAPP_PROVIDERS.ULTRAMSG && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="UltraMsg Instance ID"
+                placeholder="e.g. instance12345"
+                value={waConfig.instanceId}
+                onChange={(e) => setWaConfig({ ...waConfig, instanceId: e.target.value })}
+              />
+              <Input
+                label="UltraMsg Token"
+                type="password"
+                placeholder="e.g. abc123def456"
+                value={waConfig.token}
+                onChange={(e) => setWaConfig({ ...waConfig, token: e.target.value })}
+              />
+            </div>
+          )}
+
+          {waConfig.provider === WHATSAPP_PROVIDERS.GREENAPI && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Green API IdInstance"
+                placeholder="e.g. 1101823456"
+                value={waConfig.instanceId}
+                onChange={(e) => setWaConfig({ ...waConfig, instanceId: e.target.value })}
+              />
+              <Input
+                label="Green API ApiTokenInstance"
+                type="password"
+                placeholder="e.g. d123...456"
+                value={waConfig.token}
+                onChange={(e) => setWaConfig({ ...waConfig, token: e.target.value })}
+              />
+            </div>
+          )}
+
+          {waConfig.provider === WHATSAPP_PROVIDERS.CUSTOM_WEBHOOK && (
+            <Input
+              label="Custom Webhook URL"
+              placeholder="https://your-n8n-or-server.com/api/send-whatsapp"
+              value={waConfig.webhookUrl}
+              onChange={(e) => setWaConfig({ ...waConfig, webhookUrl: e.target.value })}
+              helperText="Receives POST requests with { phone, message, timestamp }"
+            />
+          )}
+
+          {/* Automation Schedule Options */}
+          <div className="pt-2 border-t border-slate-100 space-y-3">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Notification Preferences
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={waConfig.autoDispatchOnDutyDay}
+                  onChange={(e) => setWaConfig({ ...waConfig, autoDispatchOnDutyDay: e.target.checked })}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 mt-0.5"
+                />
+                <span className="text-xs text-slate-700">
+                  <strong>Send alert on duty morning:</strong> Automatically dispatches alert on the day of market duty.
+                </span>
+              </label>
+
+              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={waConfig.sendAdvanceNoticeEveningBefore}
+                  onChange={(e) => setWaConfig({ ...waConfig, sendAdvanceNoticeEveningBefore: e.target.checked })}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 mt-0.5"
+                />
+                <span className="text-xs text-slate-700">
+                  <strong>Send advance notice:</strong> Also alert member the evening before their duty day.
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end pt-2">
+            <Button
+              type="submit"
+              variant="primary"
+              loading={isSavingWa}
+              icon={CheckCircle2}
+            >
+              Save WhatsApp Automation Settings
+            </Button>
+          </div>
+        </form>
+
+        {/* Live Test Connection Box */}
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Send className="w-3.5 h-3.5 text-emerald-600" />
+            Test WhatsApp Alert Connection (টেস্ট মেসেজ পাঠান)
+          </h4>
+          <p className="text-xs text-slate-500 mb-3">
+            Verify your gateway setup by sending a live test WhatsApp alert to your personal phone number.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="w-full sm:flex-1">
+              <Input
+                placeholder="Enter recipient WhatsApp number (e.g. 017XXXXXXXX)"
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={isSendingTest}
+              onClick={handleSendTestMessage}
+              icon={Send}
+              className="w-full sm:w-auto"
+            >
+              Send Test Alert
+            </Button>
+          </div>
+
+          {testResult && (
+            <div
+              className={`mt-3 p-3 rounded-xl text-xs flex items-center gap-2 ${
+                testResult.success
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                  : 'bg-rose-50 border border-rose-200 text-rose-700'
+              }`}
+            >
+              {testResult.success ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0" />
+              )}
+              <span>{testResult.message}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* General Settings Form */}

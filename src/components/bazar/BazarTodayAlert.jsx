@@ -122,14 +122,23 @@ export const BazarTodayAlert = ({
 
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => onNotifyWhatsApp(duty)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#25D366] text-slate-950 hover:bg-[#20ba5a] transition-all shadow-md shadow-[#25D366]/20"
-                  >
-                    <MessageSquare className="w-4 h-4 fill-slate-950" />
-                    <span>WhatsApp Reminder</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onNotifyWhatsApp(duty)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#25D366] text-slate-950 hover:bg-[#20ba5a] transition-all shadow-md shadow-[#25D366]/20"
+                    >
+                      <MessageSquare className="w-4 h-4 fill-slate-950" />
+                      <span>WhatsApp Reminder</span>
+                    </button>
+
+                    {duty.autoNotified && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        Auto-Sent
+                      </span>
+                    )}
+                  </div>
 
                   {isAdmin && (
                     <button

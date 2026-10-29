@@ -481,11 +481,22 @@ export const Settings = () => {
                   How to get your free CallMeBot API Key in 30 seconds:
                 </p>
                 <ol className="list-decimal list-inside space-y-1 text-emerald-800">
-                  <li>Save the CallMeBot number <strong>+34 644 44 44 44</strong> or <strong>+34 911 06 14 06</strong> in your phone contacts.</li>
-                  <li>Send this exact WhatsApp message to that number: <code>I allow callmebot to send me messages</code></li>
+                  <li>Active CallMeBot WhatsApp number: <strong>+34 623 78 95 95</strong></li>
+                  <li>Send this exact WhatsApp message: <code>I allow callmebot to send me messages</code></li>
                   <li>CallMeBot will immediately reply with your free personal <strong>API Key</strong>.</li>
                   <li>Paste that API Key into the field above and click <strong>Save Settings</strong>.</li>
                 </ol>
+                <div className="pt-1">
+                  <a
+                    href="https://wa.me/34623789595?text=I%20allow%20callmebot%20to%20send%20me%20messages"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#25D366] text-slate-950 hover:bg-[#20ba5a] transition-all"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Click here to open WhatsApp with +34 623 78 95 95</span>
+                  </a>
+                </div>
               </div>
             </div>
           )}

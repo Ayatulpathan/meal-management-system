@@ -1,0 +1,32 @@
+name: Daily Automated Bazar Duty Alert
+
+on:
+  schedule:
+    # 01:00 UTC = 07:00 AM Bangladesh Standard Time (BST / UTC+6)
+    - cron: '0 1 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub anytime
+
+jobs:
+  dispatch-duty-alerts:
+    name: Run Daily Duty Dispatcher
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Execute Daily WhatsApp Bazar Dispatcher
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY || 'AIzaSyDcvOWmVDpn1VX2FWnmPU1NyqhrhGTviZQ' }}
+          VITE_FIREBASE_PROJECT_ID: 'khadok-meal'
+          CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
+        run: node scripts/cron-whatsapp-duty.mjs

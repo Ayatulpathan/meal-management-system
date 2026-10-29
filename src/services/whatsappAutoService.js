@@ -284,6 +284,21 @@ export const whatsappAutoService = {
       return { dispatched: 0, skipped: true, reason: 'Automation is disabled in Settings' };
     }
 
+    // Check if the current time has reached the scheduled notification time
+    if (config.notifyTime) {
+      const now = new Date();
+      const currentHours = String(now.getHours()).padStart(2, '0');
+      const currentMins = String(now.getMinutes()).padStart(2, '0');
+      const currentTimeStr = `${currentHours}:${currentMins}`;
+      if (currentTimeStr < config.notifyTime) {
+        return {
+          dispatched: 0,
+          skipped: true,
+          reason: `Alert scheduled for ${config.notifyTime} (current time is ${currentTimeStr})`,
+        };
+      }
+    }
+
     const todayStr = getTodayDateString();
     const todayDuties = schedules.filter(
       (s) => s.date === todayStr && !s.autoNotified && s.memberPhone
@@ -337,5 +352,38 @@ Date: ${getTodayDateString()}
       message: testMessage,
       config,
     });
+  },
+
+  /**
+   * Request browser push notification permission
+   * @returns {Promise<string>}
+   */
+  async requestNotificationPermission() {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        return await Notification.requestPermission();
+      } catch (e) {
+        return 'denied';
+      }
+    }
+    return 'unsupported';
+  },
+
+  /**
+   * Trigger device push notification
+   * @param {string} title
+   * @param {string} body
+   */
+  triggerBrowserNotification(title, body) {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, {
+          body,
+          icon: '/favicon.ico',
+        });
+      } catch (err) {
+        console.warn('Browser notification error:', err);
+      }
+    }
   },
 };

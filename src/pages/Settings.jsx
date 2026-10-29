@@ -539,8 +539,50 @@ export const Settings = () => {
           {/* Automation Schedule Options */}
           <div className="pt-2 border-t border-slate-100 space-y-3">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Notification Preferences
+              Notification Timing & Preferences (অ্যালার্টের সময়সূচী)
             </h4>
+
+            {/* Daily Alert Time Picker */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block">
+                    Daily Automatic Alert Time (প্রতিদিন অ্যালার্ট পাঠানোর সময়):
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    The system runs 24/7 on GitHub Cloud and auto-sends the WhatsApp notice at this time every morning for free.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={waConfig.notifyTime || '07:00'}
+                    onChange={(e) => setWaConfig({ ...waConfig, notifyTime: e.target.value })}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Presets:</span>
+                {['06:30', '07:00', '07:30', '08:00', '21:00'].map((time) => (
+                  <button
+                    key={time}
+                    type="button"
+                    onClick={() => setWaConfig({ ...waConfig, notifyTime: time })}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                      waConfig.notifyTime === time
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {time === '21:00' ? '9:00 PM (Night)' : `${time} AM`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer">
                 <input

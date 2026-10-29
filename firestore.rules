@@ -32,9 +32,18 @@ service cloud.firestore {
         allow read, write: if true;
       }
 
+      match /bazarSchedules/{scheduleId} {
+        allow read, write: if true;
+      }
+
       match /config/{configId} {
         allow read, write: if true;
       }
+    }
+
+    // Root-level Bazar Schedules
+    match /bazarSchedules/{scheduleId} {
+      allow read, write: if true;
     }
 
     // Settings collection

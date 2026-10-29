@@ -20,20 +20,23 @@ import {
   BAZAR_DUTY_STATUS
 } from '../models/bazarScheduleModel';
 
+import { getCurrentMonthId } from '../utils/dateUtils';
+
 const BAZAR_SCHEDULE_STORAGE_PREFIX = 'mms_bazar_schedule_';
-const getStorageKey = (monthId) => `${BAZAR_SCHEDULE_STORAGE_PREFIX}${monthId}`;
+const getStorageKey = (monthId) => `${BAZAR_SCHEDULE_STORAGE_PREFIX}${monthId || getCurrentMonthId()}`;
 
 // Seed initial default demo schedules for active month when in local storage mode
 const getLocalSchedules = (monthId) => {
-  const key = getStorageKey(monthId);
+  const activeMonth = monthId || getCurrentMonthId();
+  const key = getStorageKey(activeMonth);
   const stored = localStorage.getItem(key);
   if (!stored) {
     // Generate a couple of demo duties for the current month
-    const [year, month] = (monthId || '2026-10').split('-');
+    const [year, month] = activeMonth.split('-');
     const initial = [
       {
         id: 'sch_demo_01',
-        monthId,
+        monthId: activeMonth,
         date: `${year}-${month}-02`,
         memberId: 'm1',
         memberName: 'Rahim',
@@ -46,7 +49,7 @@ const getLocalSchedules = (monthId) => {
       },
       {
         id: 'sch_demo_02',
-        monthId,
+        monthId: activeMonth,
         date: `${year}-${month}-05`,
         memberId: 'm2',
         memberName: 'Karim',
@@ -75,16 +78,17 @@ const saveLocalSchedules = (monthId, schedules) => {
 export const bazarScheduleService = {
   /**
    * Real-time subscription to monthly bazar schedules
+   * Path: months/{monthId}/bazarSchedules
    * @param {string} monthId 
    * @param {Function} callback 
    * @returns {Function} Unsubscribe
    */
   subscribeBazarSchedule(monthId, callback) {
-    if (!monthId) return () => {};
+    const activeMonth = monthId || getCurrentMonthId();
 
     if (!isFirebaseConfigured()) {
       const load = () => {
-        const list = getLocalSchedules(monthId);
+        const list = getLocalSchedules(activeMonth);
         list.sort((a, b) => (a.date > b.date ? 1 : -1));
         callback(list);
       };
@@ -94,12 +98,8 @@ export const bazarScheduleService = {
     }
 
     try {
-      const schedRef = collection(db, 'bazarSchedules');
-      const q = query(
-        schedRef,
-        where('monthId', '==', monthId),
-        orderBy('date', 'asc')
-      );
+      const schedRef = collection(db, 'months', activeMonth, 'bazarSchedules');
+      const q = query(schedRef, orderBy('date', 'asc'));
 
       return onSnapshot(
         q,
@@ -112,12 +112,12 @@ export const bazarScheduleService = {
         },
         (error) => {
           console.error('Error listening to bazar schedules:', error);
-          callback(getLocalSchedules(monthId));
+          callback(getLocalSchedules(activeMonth));
         }
       );
     } catch (err) {
       console.error('Error initiating bazar schedules listener:', err);
-      callback(getLocalSchedules(monthId));
+      callback(getLocalSchedules(activeMonth));
       return () => {};
     }
   },
@@ -129,20 +129,23 @@ export const bazarScheduleService = {
    */
   async addSchedule(scheduleData) {
     const model = createBazarScheduleModel(scheduleData);
+    const targetMonth = model.monthId || getCurrentMonthId();
 
     if (!isFirebaseConfigured()) {
-      const list = getLocalSchedules(model.monthId);
+      const list = getLocalSchedules(targetMonth);
       const newItem = {
         id: `sch_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         ...model,
+        monthId: targetMonth,
       };
       list.push(newItem);
-      saveLocalSchedules(model.monthId, list);
+      saveLocalSchedules(targetMonth, list);
       return { success: true, id: newItem.id, data: newItem };
     }
 
     try {
-      const docRef = await addDoc(collection(db, 'bazarSchedules'), model);
+      const schedRef = collection(db, 'months', targetMonth, 'bazarSchedules');
+      const docRef = await addDoc(schedRef, model);
       return { success: true, id: docRef.id, data: model };
     } catch (err) {
       console.error('Error adding bazar schedule:', err);
@@ -157,8 +160,9 @@ export const bazarScheduleService = {
    * @returns {Promise<Object>}
    */
   async updateSchedule(scheduleId, updateData) {
+    const monthId = updateData.monthId || getCurrentMonthId();
+
     if (!isFirebaseConfigured()) {
-      const monthId = updateData.monthId;
       const list = getLocalSchedules(monthId);
       const index = list.findIndex((item) => item.id === scheduleId);
       if (index !== -1) {
@@ -174,7 +178,7 @@ export const bazarScheduleService = {
     }
 
     try {
-      const docRef = doc(db, 'bazarSchedules', scheduleId);
+      const docRef = doc(db, 'months', monthId, 'bazarSchedules', scheduleId);
       await updateDoc(docRef, {
         ...updateData,
         updatedAt: new Date().toISOString(),
@@ -193,15 +197,18 @@ export const bazarScheduleService = {
    * @returns {Promise<Object>}
    */
   async deleteSchedule(scheduleId, monthId) {
+    const activeMonth = monthId || getCurrentMonthId();
+
     if (!isFirebaseConfigured()) {
-      const list = getLocalSchedules(monthId);
+      const list = getLocalSchedules(activeMonth);
       const filtered = list.filter((item) => item.id !== scheduleId);
-      saveLocalSchedules(monthId, filtered);
+      saveLocalSchedules(activeMonth, filtered);
       return { success: true };
     }
 
     try {
-      await deleteDoc(doc(db, 'bazarSchedules', scheduleId));
+      const docRef = doc(db, 'months', activeMonth, 'bazarSchedules', scheduleId);
+      await deleteDoc(docRef);
       return { success: true };
     } catch (err) {
       console.error('Error deleting bazar schedule:', err);
@@ -224,7 +231,7 @@ export const bazarScheduleService = {
 
     return this.updateSchedule(scheduleId, {
       status: nextStatus,
-      monthId,
+      monthId: monthId || getCurrentMonthId(),
     });
   },
 
@@ -251,7 +258,8 @@ export const bazarScheduleService = {
       return { success: false, error: 'No members selected for duty rotation.' };
     }
 
-    const [year, month] = monthId.split('-');
+    const activeMonth = monthId || getCurrentMonthId();
+    const [year, month] = activeMonth.split('-');
     const generated = [];
     let memberIndex = 0;
 
@@ -262,7 +270,7 @@ export const bazarScheduleService = {
 
       generated.push(
         createBazarScheduleModel({
-          monthId,
+          monthId: activeMonth,
           date: dateStr,
           memberId: member.id,
           memberName: member.name,
@@ -277,7 +285,7 @@ export const bazarScheduleService = {
     }
 
     if (!isFirebaseConfigured()) {
-      const currentList = getLocalSchedules(monthId);
+      const currentList = getLocalSchedules(activeMonth);
       const combined = [
         ...currentList,
         ...generated.map((item) => ({
@@ -285,14 +293,13 @@ export const bazarScheduleService = {
           ...item,
         })),
       ];
-      saveLocalSchedules(monthId, combined);
+      saveLocalSchedules(activeMonth, combined);
       return { success: true, count: generated.length };
     }
 
     try {
-      const batchPromises = generated.map((item) =>
-        addDoc(collection(db, 'bazarSchedules'), item)
-      );
+      const schedRef = collection(db, 'months', activeMonth, 'bazarSchedules');
+      const batchPromises = generated.map((item) => addDoc(schedRef, item));
       await Promise.all(batchPromises);
       return { success: true, count: generated.length };
     } catch (err) {

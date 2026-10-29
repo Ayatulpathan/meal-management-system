@@ -2,16 +2,17 @@ import { useState, useEffect, useMemo } from 'react';
 import { bazarScheduleService } from '../services/bazarScheduleService';
 import { useMonthContext } from '../context/MonthContext';
 import { useMembers } from './useMembers';
-import { getTodayDateString } from '../utils/dateUtils';
+import { getTodayDateString, getCurrentMonthId } from '../utils/dateUtils';
 import {
   generateWhatsAppMessage,
   openWhatsAppChat,
   copyToClipboard
 } from '../utils/bazarNotificationUtils';
 
-export const useBazarSchedule = () => {
-  const { currentMonthId } = useMonthContext();
+export const useBazarSchedule = (customMonthId = null) => {
+  const { selectedMonth, currentMonthData } = useMonthContext();
   const { activeMembers } = useMembers();
+  const activeMonthId = customMonthId || selectedMonth || currentMonthData?.month || getCurrentMonthId();
 
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,19 +20,30 @@ export const useBazarSchedule = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!currentMonthId) return;
+    if (!activeMonthId) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     const unsubscribe = bazarScheduleService.subscribeBazarSchedule(
-      currentMonthId,
+      activeMonthId,
       (data) => {
-        setSchedules(data);
+        setSchedules(data || []);
         setLoading(false);
       }
     );
 
-    return () => unsubscribe();
-  }, [currentMonthId]);
+    // Safety timeout so it never hangs in loading state
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
+
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [activeMonthId]);
 
   const todayDate = getTodayDateString();
 
@@ -81,7 +93,7 @@ export const useBazarSchedule = () => {
     try {
       const res = await bazarScheduleService.addSchedule({
         ...scheduleData,
-        monthId: currentMonthId,
+        monthId: activeMonthId,
       });
       return res;
     } catch (err) {
@@ -98,7 +110,7 @@ export const useBazarSchedule = () => {
     try {
       const res = await bazarScheduleService.updateSchedule(scheduleId, {
         ...updateData,
-        monthId: currentMonthId,
+        monthId: activeMonthId,
       });
       return res;
     } catch (err) {
@@ -113,7 +125,7 @@ export const useBazarSchedule = () => {
     setActionLoading(true);
     setError(null);
     try {
-      const res = await bazarScheduleService.deleteSchedule(scheduleId, currentMonthId);
+      const res = await bazarScheduleService.deleteSchedule(scheduleId, activeMonthId);
       return res;
     } catch (err) {
       setError(err.message);
@@ -126,7 +138,7 @@ export const useBazarSchedule = () => {
   const toggleStatus = async (scheduleId, currentStatus) => {
     setActionLoading(true);
     try {
-      return await bazarScheduleService.toggleStatus(scheduleId, currentStatus, currentMonthId);
+      return await bazarScheduleService.toggleStatus(scheduleId, currentStatus, activeMonthId);
     } finally {
       setActionLoading(false);
     }
@@ -138,7 +150,7 @@ export const useBazarSchedule = () => {
     try {
       const res = await bazarScheduleService.autoRotateSchedule({
         ...config,
-        monthId: currentMonthId,
+        monthId: activeMonthId,
       });
       return res;
     } catch (err) {

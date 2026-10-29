@@ -9,7 +9,8 @@ import {
   FileSpreadsheet,
   UserCheck,
   MessageSquare,
-  Building2
+  Building2,
+  CalendarDays
 } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { useChatContext } from '../../context/ChatContext';
@@ -21,6 +22,7 @@ export const MobileNavigation = () => {
   const adminNavItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Meals', path: '/meals', icon: UtensilsCrossed },
+    { name: 'Bazar', path: '/bazar-schedule', icon: CalendarDays },
     { name: 'Rent', path: '/rent-utilities', icon: Building2 },
     { name: 'Chat', path: '/chat', icon: MessageSquare },
     { name: 'Market', path: '/market-costs', icon: ShoppingCart },
@@ -31,6 +33,7 @@ export const MobileNavigation = () => {
   const memberNavItems = [
     { name: 'Portal', path: '/portal', icon: UserCheck },
     { name: 'Meals', path: '/meals', icon: UtensilsCrossed },
+    { name: 'Bazar', path: '/bazar-schedule', icon: CalendarDays },
     { name: 'Rent', path: '/rent-utilities', icon: Building2 },
     { name: 'Chat', path: '/chat', icon: MessageSquare },
     { name: 'Market', path: '/market-costs', icon: ShoppingCart },

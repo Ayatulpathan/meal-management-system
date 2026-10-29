@@ -11,7 +11,9 @@ import {
   Info,
   Sparkles,
   CheckCircle2,
-  Clock
+  Clock,
+  CalendarDays,
+  MessageSquare
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { useMonthContext } from '../context/MonthContext';
@@ -19,6 +21,7 @@ import { useMeals } from '../controllers/useMeals';
 import { useMarketCosts } from '../controllers/useMarketCosts';
 import { useDeposits } from '../controllers/useDeposits';
 import { useMonthlySummary } from '../controllers/useMonthlySummary';
+import { useBazarSchedule } from '../controllers/useBazarSchedule';
 import { SummaryCard } from '../components/common/SummaryCard';
 import { Button } from '../components/common/Button';
 import { Loader } from '../components/common/Loader';
@@ -32,6 +35,7 @@ export const MemberPortal = () => {
   const { summary, loading: summaryLoading, raw } = useMonthlySummary();
   const { daysCount } = useMeals();
   const { addMarketCost, actionLoading: marketActionLoading } = useMarketCosts();
+  const { schedules, notifyOnWhatsApp } = useBazarSchedule();
 
   const [isCostModalOpen, setIsCostModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('planner'); // 'planner', 'finances', 'transparency'
@@ -39,6 +43,17 @@ export const MemberPortal = () => {
   const memberId = currentMemberId;
   const daysList = getDayList(selectedMonth);
   const todayDay = getTodayDayNumber();
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const myBazarDuties = useMemo(() => {
+    return schedules.filter(
+      (s) => s.memberId === memberId || s.memberName?.toLowerCase() === user?.displayName?.toLowerCase()
+    );
+  }, [schedules, memberId, user]);
+
+  const nextBazarDuty = useMemo(() => {
+    return myBazarDuties.find((s) => s.date >= todayStr && s.status !== 'completed');
+  }, [myBazarDuties, todayStr]);
 
   // Find member's specific summary
   const mySummary = useMemo(() => {
@@ -126,6 +141,39 @@ export const MemberPortal = () => {
           </div>
         )}
       </div>
+
+      {/* Member Bazar Duty Alert */}
+      {nextBazarDuty && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20 shrink-0">
+              <CalendarDays className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-slate-900 text-sm">
+                  {nextBazarDuty.date === todayStr ? "🛒 You have Bazar Duty Today!" : `🛒 Upcoming Bazar Duty on ${formatDateDisplay(nextBazarDuty.date)}`}
+                </span>
+                {nextBazarDuty.date === todayStr && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200">Today</span>
+                )}
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {nextBazarDuty.notes ? `Note: ${nextBazarDuty.notes}` : 'Please coordinate with the manager to collect grocery list and money.'}
+                {nextBazarDuty.estimatedBudget > 0 && ` • Budget: ${formatCurrency(nextBazarDuty.estimatedBudget)}`}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => notifyOnWhatsApp(nextBazarDuty)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#25D366] text-slate-950 hover:bg-[#20ba5a] transition-all shrink-0 shadow-md shadow-[#25D366]/20"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>WhatsApp Details</span>
+          </button>
+        </div>
+      )}
 
       {/* Personal Financial Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

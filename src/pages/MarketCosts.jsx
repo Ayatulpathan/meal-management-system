@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, ShoppingCart, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, ShoppingCart, Lock, CalendarDays } from 'lucide-react';
 import { useMarketCosts } from '../controllers/useMarketCosts';
 import { useMembers } from '../controllers/useMembers';
 import { useMonthContext } from '../context/MonthContext';
@@ -25,6 +26,7 @@ export const MarketCosts = () => {
     deleteMarketCost,
   } = useMarketCosts();
 
+  const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCost, setEditingCost] = useState(null);
   const [deletingCost, setDeletingCost] = useState(null);
@@ -82,10 +84,21 @@ export const MarketCosts = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="bg-slate-100 border border-slate-200 px-4 py-1.5 rounded-xl text-xs font-bold text-slate-800">
             Total Expense: {formatCurrency(totalMarketCost)}
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/bazar-schedule')}
+            icon={CalendarDays}
+            className="text-xs"
+          >
+            Bazar Schedule
+          </Button>
+
           {!isClosed && (
             <Button variant="primary" onClick={handleOpenAdd} icon={Plus}>
               Record Expense

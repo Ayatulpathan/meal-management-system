@@ -13,7 +13,8 @@ import {
   Lock,
   UserCheck,
   MessageSquare,
-  Building2
+  Building2,
+  CalendarDays
 } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMonthContext } from '../../context/MonthContext';
@@ -35,6 +36,7 @@ export const Sidebar = ({ onClose }) => {
     { name: 'Members', path: '/members', icon: Users },
     { name: 'Meal Entry Grid', path: '/meals', icon: UtensilsCrossed },
     { name: 'Market Cost', path: '/market-costs', icon: ShoppingCart },
+    { name: 'Bazar Schedule', path: '/bazar-schedule', icon: CalendarDays },
     { name: 'Deposits', path: '/deposits', icon: Wallet },
     { name: 'House Rent & Utility', path: '/rent-utilities', icon: Building2 },
     { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
@@ -46,6 +48,7 @@ export const Sidebar = ({ onClose }) => {
     { name: 'My Member Portal', path: '/portal', icon: UserCheck },
     { name: 'Spreadsheet Grid', path: '/meals', icon: UtensilsCrossed },
     { name: 'Market Expenses', path: '/market-costs', icon: ShoppingCart },
+    { name: 'Bazar Schedule', path: '/bazar-schedule', icon: CalendarDays },
     { name: 'Deposits Ledger', path: '/deposits', icon: Wallet },
     { name: 'House Rent & Utility', path: '/rent-utilities', icon: Building2 },
     { name: 'Monthly Reports', path: '/reports', icon: FileSpreadsheet },

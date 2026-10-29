@@ -12,6 +12,8 @@ import {
 import { validateMealValue, validateMarketCost, validateDeposit, validateMember } from './src/utils/validation.js';
 import { formatCurrency, formatBalance, parseAmount } from './src/utils/currencyUtils.js';
 import { formatDateDisplay, formatTimeDisplay, getDaysInMonth, getDayList } from './src/utils/dateUtils.js';
+import { createBazarScheduleModel, sanitizeBazarSchedule, BAZAR_DUTY_STATUS } from './src/models/bazarScheduleModel.js';
+import { sanitizeBDPhoneNumber, generateWhatsAppMessage, getWhatsAppUrl } from './src/utils/bazarNotificationUtils.js';
 
 console.log('====================================================');
 console.log('FULL COMPREHENSIVE PROJECT AUDIT & TEST SUITE');
@@ -318,6 +320,50 @@ assert(em3.status === 'partial', `Member Due 3 status = partial (actual: ${em3.s
 assert(extraSummary.totalExtraToRefund === 1500, `Total Extra To Refund = 1500 (actual: ${extraSummary.totalExtraToRefund})`);
 assert(extraSummary.membersWithExtraCount === 1, `Members With Extra Count = 1 (actual: ${extraSummary.membersWithExtraCount})`);
 assert(extraSummary.totalDue === 1500, `Total Due Remaining = 1500 (actual: ${extraSummary.totalDue})`);
+
+// -------------------------------------------------------------------
+// SUITE 9: Bazar Schedule (বাজার শিডিউল) & WhatsApp Notifications
+// -------------------------------------------------------------------
+const testScheduleModel = createBazarScheduleModel({
+  monthId: '2026-10',
+  date: '2026-10-30',
+  memberId: 'm1',
+  memberName: 'Tanvir Rahman',
+  memberPhone: '01712-345678',
+  notes: 'Fish, Vegetables, Cooking Oil',
+  estimatedBudget: 3500,
+});
+
+assert(testScheduleModel.monthId === '2026-10', 'Schedule model monthId set correctly');
+assert(testScheduleModel.memberName === 'Tanvir Rahman', 'Schedule model memberName set correctly');
+assert(testScheduleModel.status === 'pending', 'Schedule model default status is pending');
+assert(testScheduleModel.estimatedBudget === 3500, 'Schedule model budget parsed as 3500');
+
+// Phone Sanitizer for BD (+880) WhatsApp Links
+assert(sanitizeBDPhoneNumber('01712345678') === '8801712345678', 'BD 11-digit phone sanitizes to 8801712345678');
+assert(sanitizeBDPhoneNumber('+880 1812-345678') === '8801812345678', 'Phone with spaces/dashes sanitizes cleanly');
+assert(sanitizeBDPhoneNumber('8801912345678') === '8801912345678', 'Phone already having 880 remains preserved');
+
+// WhatsApp Message Content
+const waMsg = generateWhatsAppMessage({
+  schedule: testScheduleModel,
+  messName: 'MessHishab',
+});
+
+assert(waMsg.includes('Tanvir Rahman'), 'WhatsApp message contains member name');
+assert(waMsg.includes('MessHishab'), 'WhatsApp message contains mess name');
+assert(waMsg.includes('Bazar Duty') || waMsg.includes('বাজার'), 'WhatsApp message mentions Bazar Duty');
+assert(waMsg.includes('Fish, Vegetables, Cooking Oil'), 'WhatsApp message includes notes');
+assert(waMsg.includes('3,500') || waMsg.includes('3500'), 'WhatsApp message includes budget');
+
+// WhatsApp Deep Link URL
+const waUrl = getWhatsAppUrl({
+  phone: testScheduleModel.memberPhone,
+  message: waMsg,
+});
+
+assert(waUrl.startsWith('https://wa.me/8801712345678?text='), 'WhatsApp URL starts with https://wa.me/8801712345678?text=');
+assert(waUrl.includes(encodeURIComponent('Tanvir Rahman')), 'WhatsApp URL encodes member name properly');
 
 console.log('====================================================');
 console.log(`AUDIT RESULTS: ALL ${passedTests}/${totalTests} TESTS PASSED WITH 100% SUCCESS!`);

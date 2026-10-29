@@ -9,22 +9,31 @@ import {
   Building2,
   Sparkles,
   Plus,
-  Coins
+  Coins,
+  CalendarDays
 } from 'lucide-react';
 import { useMonthlySummary } from '../controllers/useMonthlySummary';
+import { useBazarSchedule } from '../controllers/useBazarSchedule';
 import { useAuthContext } from '../context/AuthContext';
 import { DashboardStats } from '../components/dashboard/DashboardStats';
 import { TodayMealSummary } from '../components/dashboard/TodayMealSummary';
 import { FinancialSummary } from '../components/dashboard/FinancialSummary';
 import { RecentTransactions } from '../components/dashboard/RecentTransactions';
+import { BazarTodayAlert } from '../components/bazar/BazarTodayAlert';
 import { Button } from '../components/common/Button';
 import { Loader } from '../components/common/Loader';
 import { formatCurrency } from '../utils/currencyUtils';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuthContext();
+  const { user, isAdmin } = useAuthContext();
   const { summary, loading, raw, monthData, isClosed } = useMonthlySummary();
+  const {
+    todaySchedules,
+    tomorrowSchedules,
+    notifyOnWhatsApp,
+    toggleStatus
+  } = useBazarSchedule();
 
   if (loading) {
     return <Loader message="Loading dashboard & calculating finances..." fullScreen />;
@@ -72,6 +81,16 @@ export const Dashboard = () => {
             Meal Entry Grid
           </Button>
 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/bazar-schedule')}
+            icon={CalendarDays}
+            className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+          >
+            Bazar Schedule
+          </Button>
+
           {!isClosed && (
             <>
               <Button
@@ -106,6 +125,15 @@ export const Dashboard = () => {
           </Button>
         </div>
       </div>
+
+      {/* Today's Bazar Duty Alert Widget */}
+      <BazarTodayAlert
+        todaySchedules={todaySchedules}
+        tomorrowSchedules={tomorrowSchedules}
+        isAdmin={isAdmin && !isClosed}
+        onNotifyWhatsApp={notifyOnWhatsApp}
+        onToggleStatus={toggleStatus}
+      />
 
       {/* 6 Key Stat Cards */}
       <DashboardStats summary={summary} loading={loading} />

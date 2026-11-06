@@ -44,11 +44,37 @@ export const authService = {
       }
     }
 
-    // Check against Firestore / Local Registered Members & Admins across all messes
-    const members = await memberService.getMembers('all');
-    const matchedMember = members.find(
+    // Resolve user's mess association from users directory or default to Khadok Mess
+    let userMessId = DEFAULT_MESS_ID;
+    if (isFirebaseConfigured()) {
+      try {
+        const userDocRef = doc(db, 'users', cleanEmail);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
+          userMessId = userSnap.data()?.messId || DEFAULT_MESS_ID;
+        }
+      } catch (uErr) {
+        console.warn('Users mapping lookup notice:', uErr.message);
+      }
+    }
+
+    // Check members inside user's designated mess
+    let members = await memberService.getMembers(userMessId);
+    let matchedMember = members.find(
       (m) => m.email && m.email.toLowerCase() === cleanEmail
     );
+
+    // If not found and userMessId wasn't default, check Khadok Mess as non-destructive fallback
+    if (!matchedMember && userMessId !== DEFAULT_MESS_ID) {
+      const defaultMembers = await memberService.getMembers(DEFAULT_MESS_ID);
+      const fallbackMatch = defaultMembers.find(
+        (m) => m.email && m.email.toLowerCase() === cleanEmail
+      );
+      if (fallbackMatch) {
+        matchedMember = fallbackMatch;
+        userMessId = DEFAULT_MESS_ID;
+      }
+    }
 
     if (matchedMember) {
       if (matchedMember.status === 'inactive') {
@@ -57,7 +83,6 @@ export const authService = {
 
       const expectedPassword = matchedMember.password || 'member123';
       if (cleanPassword === expectedPassword) {
-        const userMessId = matchedMember.messId || DEFAULT_MESS_ID;
         const user = {
           uid: matchedMember.id,
           memberId: matchedMember.id,

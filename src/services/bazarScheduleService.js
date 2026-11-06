@@ -15,54 +15,43 @@ import {
   isFirebaseConfigured
 } from './firebase';
 import {
+  getMessCollection,
+  getMessDoc,
+  getRootCollection,
+  getRootDoc,
+  addMessDocData,
+  updateMessDocData,
+  deleteMessDocData
+} from './dbPaths';
+import {
   createBazarScheduleModel,
   sanitizeBazarSchedule,
   BAZAR_DUTY_STATUS
 } from '../models/bazarScheduleModel';
-
 import { getCurrentMonthId } from '../utils/dateUtils';
+import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
 const BAZAR_SCHEDULE_STORAGE_PREFIX = 'mms_bazar_schedule_';
-const getStorageKey = (monthId) => `${BAZAR_SCHEDULE_STORAGE_PREFIX}${monthId || getCurrentMonthId()}`;
 
-// Seed initial default demo schedules for active month when in local storage mode
-const getLocalSchedules = (monthId) => {
+const getStorageKey = (monthId, messId = DEFAULT_MESS_ID) => {
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
   const activeMonth = monthId || getCurrentMonthId();
-  const key = getStorageKey(activeMonth);
+  const cleanMonth = activeMonth.includes('_') ? activeMonth.split('_').pop() : activeMonth;
+  return `${BAZAR_SCHEDULE_STORAGE_PREFIX}${targetMessId}_${cleanMonth}`;
+};
+
+const getLocalSchedules = (monthId, messId = DEFAULT_MESS_ID) => {
+  const activeMonth = monthId || getCurrentMonthId();
+  const cleanMonth = activeMonth.includes('_') ? activeMonth.split('_').pop() : activeMonth;
+  const key = getStorageKey(cleanMonth, messId);
   const stored = localStorage.getItem(key);
   if (!stored) {
-    // Generate a couple of demo duties for the current month
-    const [year, month] = activeMonth.split('-');
-    const initial = [
-      {
-        id: 'sch_demo_01',
-        monthId: activeMonth,
-        date: `${year}-${month}-02`,
-        memberId: 'm1',
-        memberName: 'Rahim',
-        memberPhone: '01711000001',
-        notes: 'Fish, Rice, and green vegetables',
-        estimatedBudget: 2500,
-        status: BAZAR_DUTY_STATUS.COMPLETED,
-        assignedBy: 'Administrator',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'sch_demo_02',
-        monthId: activeMonth,
-        date: `${year}-${month}-05`,
-        memberId: 'm2',
-        memberName: 'Karim',
-        memberPhone: '01811000002',
-        notes: 'Chicken, Dal, Spices, and Cooking Oil',
-        estimatedBudget: 3000,
-        status: BAZAR_DUTY_STATUS.PENDING,
-        assignedBy: 'Administrator',
-        createdAt: new Date().toISOString(),
-      },
-    ];
-    localStorage.setItem(key, JSON.stringify(initial));
-    return initial;
+    const legacyKey = `${BAZAR_SCHEDULE_STORAGE_PREFIX}${cleanMonth}`;
+    const legacyStored = localStorage.getItem(legacyKey);
+    if (legacyStored && (messId === DEFAULT_MESS_ID || !messId)) {
+      try { return JSON.parse(legacyStored); } catch (e) { return []; }
+    }
+    return [];
   }
   try {
     return JSON.parse(stored);
@@ -71,24 +60,26 @@ const getLocalSchedules = (monthId) => {
   }
 };
 
-const saveLocalSchedules = (monthId, schedules) => {
-  localStorage.setItem(getStorageKey(monthId), JSON.stringify(schedules));
+const saveLocalSchedules = (monthId, list, messId = DEFAULT_MESS_ID) => {
+  const activeMonth = monthId || getCurrentMonthId();
+  const cleanMonth = activeMonth.includes('_') ? activeMonth.split('_').pop() : activeMonth;
+  localStorage.setItem(getStorageKey(cleanMonth, messId), JSON.stringify(list));
 };
 
 export const bazarScheduleService = {
   /**
-   * Real-time subscription to monthly bazar schedules
-   * Path: months/{monthId}/bazarSchedules
-   * @param {string} monthId 
-   * @param {Function} callback 
-   * @returns {Function} Unsubscribe
+   * Subscribe to real-time bazar duties for an active month in a mess
+   * Path: messes/{messId}/months/{activeMonth}/bazarSchedules
    */
-  subscribeBazarSchedule(monthId, callback) {
-    const activeMonth = monthId || getCurrentMonthId();
+  subscribeBazarSchedule(activeMonth, callback, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = (activeMonth || getCurrentMonthId()).includes('_') 
+      ? (activeMonth || getCurrentMonthId()).split('_').pop() 
+      : (activeMonth || getCurrentMonthId());
 
     if (!isFirebaseConfigured()) {
       const load = () => {
-        const list = getLocalSchedules(activeMonth);
+        const list = getLocalSchedules(cleanMonth, targetMessId);
         list.sort((a, b) => (a.date > b.date ? 1 : -1));
         callback(list);
       };
@@ -98,54 +89,78 @@ export const bazarScheduleService = {
     }
 
     try {
-      const schedRef = collection(db, 'months', activeMonth, 'bazarSchedules');
+      const schedRef = getMessCollection(targetMessId, 'months', cleanMonth, 'bazarSchedules');
       const q = query(schedRef, orderBy('date', 'asc'));
 
       return onSnapshot(
         q,
         (snapshot) => {
-          const items = snapshot.docs.map((docSnap) =>
-            sanitizeBazarSchedule(docSnap.id, docSnap.data())
-          );
-          items.sort((a, b) => (a.date > b.date ? 1 : -1));
-          callback(items);
+          if (!snapshot.empty) {
+            const items = snapshot.docs.map((docSnap) =>
+              sanitizeBazarSchedule(docSnap.id, docSnap.data())
+            );
+            items.sort((a, b) => (a.date > b.date ? 1 : -1));
+            saveLocalSchedules(cleanMonth, items, targetMessId);
+            callback(items);
+            return;
+          }
+
+          if (targetMessId === DEFAULT_MESS_ID) {
+            getDocs(query(getRootCollection('months', cleanMonth, 'bazarSchedules'), orderBy('date', 'asc')))
+              .then((rootSnap) => {
+                if (!rootSnap.empty) {
+                  const rootItems = rootSnap.docs.map((docSnap) =>
+                    sanitizeBazarSchedule(docSnap.id, docSnap.data())
+                  );
+                  rootItems.sort((a, b) => (a.date > b.date ? 1 : -1));
+                  saveLocalSchedules(cleanMonth, rootItems, DEFAULT_MESS_ID);
+                  callback(rootItems);
+                } else {
+                  callback([]);
+                }
+              })
+              .catch(() => callback(getLocalSchedules(cleanMonth, targetMessId)));
+            return;
+          }
+
+          callback([]);
         },
         (error) => {
           console.error('Error listening to bazar schedules:', error);
-          callback(getLocalSchedules(activeMonth));
+          callback(getLocalSchedules(cleanMonth, targetMessId));
         }
       );
     } catch (err) {
       console.error('Error initiating bazar schedules listener:', err);
-      callback(getLocalSchedules(activeMonth));
+      callback(getLocalSchedules(cleanMonth, targetMessId));
       return () => {};
     }
   },
 
   /**
    * Add a new bazar duty schedule
-   * @param {Object} scheduleData 
-   * @returns {Promise<Object>}
    */
-  async addSchedule(scheduleData) {
+  async addSchedule(scheduleData, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
     const model = createBazarScheduleModel(scheduleData);
-    const targetMonth = model.monthId || getCurrentMonthId();
+    const targetMonth = (model.monthId || getCurrentMonthId()).includes('_')
+      ? (model.monthId || getCurrentMonthId()).split('_').pop()
+      : (model.monthId || getCurrentMonthId());
 
     if (!isFirebaseConfigured()) {
-      const list = getLocalSchedules(targetMonth);
+      const list = getLocalSchedules(targetMonth, targetMessId);
       const newItem = {
         id: `sch_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         ...model,
         monthId: targetMonth,
       };
       list.push(newItem);
-      saveLocalSchedules(targetMonth, list);
+      saveLocalSchedules(targetMonth, list, targetMessId);
       return { success: true, id: newItem.id, data: newItem };
     }
 
     try {
-      const schedRef = collection(db, 'months', targetMonth, 'bazarSchedules');
-      const docRef = await addDoc(schedRef, model);
+      const docRef = await addMessDocData(targetMessId, ['months', targetMonth, 'bazarSchedules'], model);
       return { success: true, id: docRef.id, data: model };
     } catch (err) {
       console.error('Error adding bazar schedule:', err);
@@ -155,31 +170,30 @@ export const bazarScheduleService = {
 
   /**
    * Update an existing bazar schedule
-   * @param {string} scheduleId 
-   * @param {Object} updateData 
-   * @returns {Promise<Object>}
    */
-  async updateSchedule(scheduleId, updateData) {
-    const monthId = updateData.monthId || getCurrentMonthId();
+  async updateSchedule(scheduleId, updateData, activeMonth, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const monthId = (updateData.monthId || activeMonth || getCurrentMonthId()).includes('_')
+      ? (updateData.monthId || activeMonth || getCurrentMonthId()).split('_').pop()
+      : (updateData.monthId || activeMonth || getCurrentMonthId());
 
     if (!isFirebaseConfigured()) {
-      const list = getLocalSchedules(monthId);
-      const index = list.findIndex((item) => item.id === scheduleId);
-      if (index !== -1) {
-        list[index] = {
-          ...list[index],
+      const list = getLocalSchedules(monthId, targetMessId);
+      const idx = list.findIndex((item) => item.id === scheduleId);
+      if (idx !== -1) {
+        list[idx] = {
+          ...list[idx],
           ...updateData,
           updatedAt: new Date().toISOString(),
         };
-        saveLocalSchedules(monthId, list);
-        return { success: true };
+        saveLocalSchedules(monthId, list, targetMessId);
+        return { success: true, data: list[idx] };
       }
-      return { success: false, error: 'Schedule item not found' };
+      return { success: false, error: 'Schedule not found' };
     }
 
     try {
-      const docRef = doc(db, 'months', monthId, 'bazarSchedules', scheduleId);
-      await updateDoc(docRef, {
+      await updateMessDocData(targetMessId, ['months', monthId, 'bazarSchedules', scheduleId], {
         ...updateData,
         updatedAt: new Date().toISOString(),
       });
@@ -192,23 +206,22 @@ export const bazarScheduleService = {
 
   /**
    * Delete a bazar schedule entry
-   * @param {string} scheduleId 
-   * @param {string} monthId 
-   * @returns {Promise<Object>}
    */
-  async deleteSchedule(scheduleId, monthId) {
-    const activeMonth = monthId || getCurrentMonthId();
+  async deleteSchedule(scheduleId, monthId, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const activeMonth = (monthId || getCurrentMonthId()).includes('_')
+      ? (monthId || getCurrentMonthId()).split('_').pop()
+      : (monthId || getCurrentMonthId());
 
     if (!isFirebaseConfigured()) {
-      const list = getLocalSchedules(activeMonth);
+      const list = getLocalSchedules(activeMonth, targetMessId);
       const filtered = list.filter((item) => item.id !== scheduleId);
-      saveLocalSchedules(activeMonth, filtered);
+      saveLocalSchedules(activeMonth, filtered, targetMessId);
       return { success: true };
     }
 
     try {
-      const docRef = doc(db, 'months', activeMonth, 'bazarSchedules', scheduleId);
-      await deleteDoc(docRef);
+      await deleteMessDocData(targetMessId, ['months', activeMonth, 'bazarSchedules', scheduleId]);
       return { success: true };
     } catch (err) {
       console.error('Error deleting bazar schedule:', err);
@@ -218,12 +231,8 @@ export const bazarScheduleService = {
 
   /**
    * Toggle status between pending and completed
-   * @param {string} scheduleId 
-   * @param {string} currentStatus 
-   * @param {string} monthId 
-   * @returns {Promise<Object>}
    */
-  async toggleStatus(scheduleId, currentStatus, monthId) {
+  async toggleStatus(scheduleId, currentStatus, monthId, messId) {
     const nextStatus =
       currentStatus === BAZAR_DUTY_STATUS.COMPLETED
         ? BAZAR_DUTY_STATUS.PENDING
@@ -232,19 +241,11 @@ export const bazarScheduleService = {
     return this.updateSchedule(scheduleId, {
       status: nextStatus,
       monthId: monthId || getCurrentMonthId(),
-    });
+    }, monthId, messId);
   },
 
   /**
    * Auto-rotate bazar duties among active members for a date range
-   * @param {Object} params
-   * @param {string} params.monthId
-   * @param {number} params.startDay (1-31)
-   * @param {number} params.endDay (1-31)
-   * @param {number} [params.intervalDays=2]
-   * @param {Array} params.selectedMembers [{ id, name, phone }]
-   * @param {string} [params.assignedBy='Administrator']
-   * @returns {Promise<Object>}
    */
   async autoRotateSchedule({
     monthId,
@@ -253,12 +254,15 @@ export const bazarScheduleService = {
     intervalDays = 2,
     selectedMembers = [],
     assignedBy = 'Administrator',
+    messId
   }) {
     if (!selectedMembers || selectedMembers.length === 0) {
       return { success: false, error: 'No members selected for duty rotation.' };
     }
 
-    const activeMonth = monthId || getCurrentMonthId();
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const rawMonth = monthId || getCurrentMonthId();
+    const activeMonth = rawMonth.includes('_') ? rawMonth.split('_').pop() : rawMonth;
     const [year, month] = activeMonth.split('-');
     const generated = [];
     let memberIndex = 0;
@@ -285,7 +289,7 @@ export const bazarScheduleService = {
     }
 
     if (!isFirebaseConfigured()) {
-      const currentList = getLocalSchedules(activeMonth);
+      const currentList = getLocalSchedules(activeMonth, targetMessId);
       const combined = [
         ...currentList,
         ...generated.map((item) => ({
@@ -293,13 +297,14 @@ export const bazarScheduleService = {
           ...item,
         })),
       ];
-      saveLocalSchedules(activeMonth, combined);
+      saveLocalSchedules(activeMonth, combined, targetMessId);
       return { success: true, count: generated.length };
     }
 
     try {
-      const schedRef = collection(db, 'months', activeMonth, 'bazarSchedules');
-      const batchPromises = generated.map((item) => addDoc(schedRef, item));
+      const batchPromises = generated.map((item) => 
+        addMessDocData(targetMessId, ['months', activeMonth, 'bazarSchedules'], item)
+      );
       await Promise.all(batchPromises);
       return { success: true, count: generated.length };
     } catch (err) {

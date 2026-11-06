@@ -10,10 +10,15 @@ import {
   setDoc,
   isFirebaseConfigured
 } from './firebase';
+import {
+  getMessDoc,
+  getRootDoc,
+  setMessDocData
+} from './dbPaths';
 import { sanitizeBDPhoneNumber, generateWhatsAppMessage } from '../utils/bazarNotificationUtils';
 import { bazarScheduleService } from './bazarScheduleService';
 import { getTodayDateString, getCurrentMonthId } from '../utils/dateUtils';
-import { DEFAULT_MESS_ID } from '../models/messModel';
+import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
 const CONFIG_STORAGE_KEY = 'mms_whatsapp_config';
 
@@ -62,13 +67,21 @@ export const whatsappAutoService = {
     }
 
     try {
-      const settingDoc = (!messId || messId === DEFAULT_MESS_ID) ? 'whatsappConfig' : `whatsappConfig_${messId}`;
-      const docRef = doc(db, 'settings', settingDoc);
+      const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+      const docRef = getMessDoc(targetMessId, 'settings', 'whatsapp');
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const firestoreConfig = { ...DEFAULT_CONFIG, ...snap.data() };
         localStorage.setItem(storageKey, JSON.stringify(firestoreConfig));
         return firestoreConfig;
+      }
+      if (targetMessId === DEFAULT_MESS_ID) {
+        const rootSnap = await getDoc(getRootDoc('settings', 'whatsappConfig'));
+        if (rootSnap.exists()) {
+          const firestoreConfig = { ...DEFAULT_CONFIG, ...rootSnap.data() };
+          localStorage.setItem(storageKey, JSON.stringify(firestoreConfig));
+          return firestoreConfig;
+        }
       }
       return cached;
     } catch (err) {
@@ -84,8 +97,8 @@ export const whatsappAutoService = {
    * @returns {Promise<Object>}
    */
   async saveConfig(newConfig, messId = DEFAULT_MESS_ID) {
-    const storageKey = (!messId || messId === DEFAULT_MESS_ID) ? CONFIG_STORAGE_KEY : `${CONFIG_STORAGE_KEY}_${messId}`;
-    const settingDoc = (!messId || messId === DEFAULT_MESS_ID) ? 'whatsappConfig' : `whatsappConfig_${messId}`;
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const storageKey = (!targetMessId || targetMessId === DEFAULT_MESS_ID) ? CONFIG_STORAGE_KEY : `${CONFIG_STORAGE_KEY}_${targetMessId}`;
 
     const merged = {
       ...DEFAULT_CONFIG,
@@ -100,8 +113,7 @@ export const whatsappAutoService = {
     }
 
     try {
-      const docRef = doc(db, 'settings', settingDoc);
-      await setDoc(docRef, merged, { merge: true });
+      await setMessDocData(targetMessId, ['settings', 'whatsapp'], merged);
       return { success: true, config: merged };
     } catch (err) {
       console.error('Error saving WhatsApp config to Firestore:', err);

@@ -10,9 +10,14 @@ import {
   setDoc,
   isFirebaseConfigured
 } from './firebase';
+import {
+  getMessDoc,
+  getRootDoc,
+  setMessDocData
+} from './dbPaths';
 import { formatDateDisplay } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/currencyUtils';
-import { DEFAULT_MESS_ID } from '../models/messModel';
+import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
 const CONFIG_STORAGE_KEY = 'mms_email_config';
 
@@ -173,12 +178,21 @@ export const emailAutoService = {
     }
 
     try {
-      const docRef = doc(db, 'settings', settingDoc);
+      const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+      const docRef = getMessDoc(targetMessId, 'settings', 'email');
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const firestoreConfig = { ...DEFAULT_CONFIG, ...snap.data() };
         localStorage.setItem(storageKey, JSON.stringify(firestoreConfig));
         return firestoreConfig;
+      }
+      if (targetMessId === DEFAULT_MESS_ID) {
+        const rootSnap = await getDoc(getRootDoc('settings', 'emailConfig'));
+        if (rootSnap.exists()) {
+          const firestoreConfig = { ...DEFAULT_CONFIG, ...rootSnap.data() };
+          localStorage.setItem(storageKey, JSON.stringify(firestoreConfig));
+          return firestoreConfig;
+        }
       }
       return cached;
     } catch (err) {
@@ -193,8 +207,8 @@ export const emailAutoService = {
    * @param {string} messId
    */
   async saveConfig(newConfig, messId = DEFAULT_MESS_ID) {
-    const storageKey = (!messId || messId === DEFAULT_MESS_ID) ? CONFIG_STORAGE_KEY : `${CONFIG_STORAGE_KEY}_${messId}`;
-    const settingDoc = (!messId || messId === DEFAULT_MESS_ID) ? 'emailConfig' : `emailConfig_${messId}`;
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const storageKey = (!targetMessId || targetMessId === DEFAULT_MESS_ID) ? CONFIG_STORAGE_KEY : `${CONFIG_STORAGE_KEY}_${targetMessId}`;
 
     const merged = {
       ...DEFAULT_CONFIG,
@@ -209,8 +223,7 @@ export const emailAutoService = {
     }
 
     try {
-      const docRef = doc(db, 'settings', settingDoc);
-      await setDoc(docRef, merged, { merge: true });
+      await setMessDocData(targetMessId, ['settings', 'email'], merged);
       return { success: true, config: merged };
     } catch (err) {
       console.error('Error saving email config to Firestore:', err);

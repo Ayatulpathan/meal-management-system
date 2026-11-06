@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDoc,
   setDoc,
   addDoc,
   deleteDoc,
@@ -13,34 +14,41 @@ import {
   serverTimestamp,
   isFirebaseConfigured
 } from './firebase';
-import { DEFAULT_MESS_ID } from '../models/messModel';
+import {
+  getMessCollection,
+  getMessDoc,
+  getRootCollection,
+  getRootDoc,
+  addMessDocData,
+  deleteMessDocData
+} from './dbPaths';
+import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
-const LOCAL_STORAGE_KEY = 'mms_chat_messages';
+const CHAT_STORAGE_KEY_PREFIX = 'mms_chat_messages_';
 
 const getLocalMessages = (messId = DEFAULT_MESS_ID) => {
-  const stored = localStorage.getItem(`${LOCAL_STORAGE_KEY}_${messId}`) || localStorage.getItem(LOCAL_STORAGE_KEY);
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  const key = `${CHAT_STORAGE_KEY_PREFIX}${targetMessId}`;
+  const stored = localStorage.getItem(key);
   if (!stored) {
+    if (targetMessId === DEFAULT_MESS_ID) {
+      const legacy = localStorage.getItem('mms_chat_messages');
+      if (legacy) {
+        try { return JSON.parse(legacy); } catch (e) { return []; }
+      }
+    }
     const initial = [
       {
-        id: 'msg_001',
-        text: 'Welcome to the Mess Group Chat! 👋 All members can communicate here in real-time.',
-        senderId: 'admin',
-        senderName: 'Administrator',
+        id: 'msg_welcome',
+        text: 'Welcome to MessHishab Chat! Discuss meals, schedules, and costs here in real time.',
+        senderId: 'system',
+        senderName: 'Mess Bot',
         senderRole: 'admin',
-        messId,
-        createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-      },
-      {
-        id: 'msg_002',
-        text: 'Please make sure to check today\'s grocery list and deposit updates. 🛒🍲',
-        senderId: 'admin',
-        senderName: 'Administrator',
-        senderRole: 'admin',
-        messId,
-        createdAt: new Date(Date.now() - 1800000).toISOString(),
-      },
+        messId: targetMessId,
+        createdAt: new Date().toISOString(),
+      }
     ];
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_${messId}`, JSON.stringify(initial));
+    localStorage.setItem(key, JSON.stringify(initial));
     return initial;
   }
   try {
@@ -51,73 +59,115 @@ const getLocalMessages = (messId = DEFAULT_MESS_ID) => {
 };
 
 const saveLocalMessages = (messages, messId = DEFAULT_MESS_ID) => {
-  localStorage.setItem(`${LOCAL_STORAGE_KEY}_${messId}`, JSON.stringify(messages));
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  const key = `${CHAT_STORAGE_KEY_PREFIX}${targetMessId}`;
+  localStorage.setItem(key, JSON.stringify(messages));
 };
 
 export const chatService = {
   /**
    * Subscribes to real-time chat messages for a specific mess
+   * Path: messes/{messId}/chatMessages
    */
-  subscribeMessages(callback, messId = DEFAULT_MESS_ID) {
+  subscribeMessages(callback, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+
     if (!isFirebaseConfigured()) {
-      const load = () => callback(getLocalMessages(messId));
+      const load = () => callback(getLocalMessages(targetMessId));
       load();
       window.addEventListener('storage', load);
       return () => window.removeEventListener('storage', load);
     }
 
     try {
-      const messagesRef = collection(db, 'chatMessages');
+      const messagesRef = getMessCollection(targetMessId, 'chatMessages');
       const q = query(messagesRef, orderBy('createdAt', 'asc'), limit(250));
 
       return onSnapshot(q, (snapshot) => {
-        const messages = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data();
-          let createdAtStr = data.createdAtIso || new Date().toISOString();
-          if (data.createdAt) {
-            if (data.createdAt.toDate && typeof data.createdAt.toDate === 'function') {
-              createdAtStr = data.createdAt.toDate().toISOString();
-            } else if (data.createdAt.seconds) {
-              createdAtStr = new Date(data.createdAt.seconds * 1000).toISOString();
-            } else if (typeof data.createdAt === 'string') {
-              createdAtStr = data.createdAt;
+        if (!snapshot.empty) {
+          const messages = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data();
+            let createdAtStr = data.createdAtIso || new Date().toISOString();
+            if (data.createdAt) {
+              if (data.createdAt.toDate && typeof data.createdAt.toDate === 'function') {
+                createdAtStr = data.createdAt.toDate().toISOString();
+              } else if (data.createdAt.seconds) {
+                createdAtStr = new Date(data.createdAt.seconds * 1000).toISOString();
+              } else if (typeof data.createdAt === 'string') {
+                createdAtStr = data.createdAt;
+              }
             }
-          }
-          return {
-            id: docSnap.id,
-            text: data.text || '',
-            senderId: data.senderId || 'unknown',
-            senderName: data.senderName || 'Member',
-            senderRole: data.senderRole || 'member',
-            messId: data.messId,
-            createdAt: createdAtStr,
-          };
-        });
+            return {
+              id: docSnap.id,
+              text: data.text || '',
+              senderId: data.senderId || 'unknown',
+              senderName: data.senderName || 'Member',
+              senderRole: data.senderRole || 'member',
+              messId: targetMessId,
+              createdAt: createdAtStr,
+            };
+          });
+          messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+          saveLocalMessages(messages, targetMessId);
+          callback(messages);
+          return;
+        }
 
-        // Filter messages by messId
-        const filtered = messages.filter(m => {
-          if (messId === DEFAULT_MESS_ID) {
-            return !m.messId || m.messId === DEFAULT_MESS_ID;
-          }
-          return m.messId === messId;
-        });
+        // If Khadok Mess and empty, fallback to root
+        if (targetMessId === DEFAULT_MESS_ID) {
+          getDocs(query(getRootCollection('chatMessages'), orderBy('createdAt', 'asc'), limit(250)))
+            .then((rootSnap) => {
+              if (!rootSnap.empty) {
+                const rootMessages = rootSnap.docs.map((docSnap) => {
+                  const data = docSnap.data();
+                  let createdAtStr = data.createdAtIso || new Date().toISOString();
+                  if (data.createdAt) {
+                    if (data.createdAt.toDate && typeof data.createdAt.toDate === 'function') {
+                      createdAtStr = data.createdAt.toDate().toISOString();
+                    } else if (data.createdAt.seconds) {
+                      createdAtStr = new Date(data.createdAt.seconds * 1000).toISOString();
+                    } else if (typeof data.createdAt === 'string') {
+                      createdAtStr = data.createdAt;
+                    }
+                  }
+                  return {
+                    id: docSnap.id,
+                    text: data.text || '',
+                    senderId: data.senderId || 'unknown',
+                    senderName: data.senderName || 'Member',
+                    senderRole: data.senderRole || 'member',
+                    messId: DEFAULT_MESS_ID,
+                    createdAt: createdAtStr,
+                  };
+                });
+                rootMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                saveLocalMessages(rootMessages, DEFAULT_MESS_ID);
+                callback(rootMessages);
+              } else {
+                callback(getLocalMessages(targetMessId));
+              }
+            })
+            .catch(() => callback(getLocalMessages(targetMessId)));
+          return;
+        }
 
-        filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        callback(filtered);
+        callback(getLocalMessages(targetMessId));
       }, (error) => {
         console.error('Error in chat real-time listener:', error);
+        callback(getLocalMessages(targetMessId));
       });
     } catch (err) {
       console.error('Chat subscription init error:', err);
-      callback(getLocalMessages(messId));
+      callback(getLocalMessages(targetMessId));
       return () => {};
     }
   },
 
   /**
-   * Send a new chat message
+   * Send a new chat message to a specific mess
    */
-  async sendMessage(messageData, messId = DEFAULT_MESS_ID) {
+  async sendMessage(messageData, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
     const { text, senderId, senderName, senderRole } = messageData;
     if (!text || !text.trim()) {
       throw new Error('Message text cannot be empty.');
@@ -128,27 +178,26 @@ export const chatService = {
       senderId: senderId || 'user',
       senderName: senderName || 'Member',
       senderRole: senderRole || 'member',
-      messId: messId || DEFAULT_MESS_ID,
+      messId: targetMessId,
       createdAt: isFirebaseConfigured() ? serverTimestamp() : new Date().toISOString(),
       createdAtIso: new Date().toISOString(),
     };
 
     if (!isFirebaseConfigured()) {
-      const messages = getLocalMessages(messId);
+      const messages = getLocalMessages(targetMessId);
       const newMsg = {
         id: `msg_${Date.now()}`,
         ...payload,
         createdAt: new Date().toISOString(),
       };
       messages.push(newMsg);
-      saveLocalMessages(messages, messId);
+      saveLocalMessages(messages, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return newMsg;
     }
 
     try {
-      const messagesRef = collection(db, 'chatMessages');
-      const docRef = await addDoc(messagesRef, payload);
+      const docRef = await addMessDocData(targetMessId, ['chatMessages'], payload);
       return { id: docRef.id, ...payload, createdAt: payload.createdAtIso };
     } catch (err) {
       console.error('Error sending chat message to Firebase:', err);
@@ -159,47 +208,50 @@ export const chatService = {
   /**
    * Delete a chat message
    */
-  async deleteMessage(messageId) {
+  async deleteMessage(messageId, messId) {
     if (!messageId) return;
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
 
     if (!isFirebaseConfigured()) {
-      const messages = getLocalMessages();
+      const messages = getLocalMessages(targetMessId);
       const filtered = messages.filter(m => m.id !== messageId);
-      saveLocalMessages(filtered);
+      saveLocalMessages(filtered, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return;
     }
 
     try {
-      const docRef = doc(db, 'chatMessages', messageId);
-      await deleteDoc(docRef);
+      await deleteMessDocData(targetMessId, ['chatMessages', messageId]);
     } catch (err) {
       console.error('Error deleting chat message:', err);
-      const messages = getLocalMessages();
+      const messages = getLocalMessages(targetMessId);
       const filtered = messages.filter(m => m.id !== messageId);
-      saveLocalMessages(filtered);
+      saveLocalMessages(filtered, targetMessId);
       window.dispatchEvent(new Event('storage'));
     }
   },
 
   /**
-   * Clear all chat messages (Admin)
+   * Clear all chat messages for a specific mess
    */
-  async clearAllMessages() {
+  async clearAllMessages(messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+
     if (!isFirebaseConfigured()) {
-      saveLocalMessages([]);
+      saveLocalMessages([], targetMessId);
       window.dispatchEvent(new Event('storage'));
       return;
     }
 
     try {
-      const messagesRef = collection(db, 'chatMessages');
+      const messagesRef = getMessCollection(targetMessId, 'chatMessages');
       const snapshot = await getDocs(messagesRef);
-      const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+      const deletePromises = snapshot.docs.map(d => deleteMessDocData(targetMessId, ['chatMessages', d.id]));
       await Promise.all(deletePromises);
+      saveLocalMessages([], targetMessId);
     } catch (err) {
       console.error('Error clearing messages:', err);
-      saveLocalMessages([]);
+      saveLocalMessages([], targetMessId);
       window.dispatchEvent(new Event('storage'));
     }
   }

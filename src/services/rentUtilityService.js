@@ -14,155 +14,264 @@ import {
   isFirebaseConfigured
 } from './firebase';
 import {
+  getMessCollection,
+  getMessDoc,
+  getRootCollection,
+  getRootDoc,
+  setMessDocData,
+  addMessDocData,
+  updateMessDocData,
+  deleteMessDocData
+} from './dbPaths';
+import {
   createUtilityBillModel,
   sanitizeUtilityBill,
   createRentPaymentModel,
   sanitizeRentPayment
 } from '../models/rentUtilityModel';
+import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
 const UTILITY_STORAGE_PREFIX = 'mms_utility_';
 const RENT_PAYMENTS_STORAGE_PREFIX = 'mms_rent_payments_';
 const MEMBER_RENTS_STORAGE_PREFIX = 'mms_member_rents_';
 
-const getUtilityStorageKey = (monthId) => `${UTILITY_STORAGE_PREFIX}${monthId}`;
-const getPaymentsStorageKey = (monthId) => `${RENT_PAYMENTS_STORAGE_PREFIX}${monthId}`;
-const getMemberRentsStorageKey = (monthId) => `${MEMBER_RENTS_STORAGE_PREFIX}${monthId}`;
+const getUtilityStorageKey = (monthId, messId = DEFAULT_MESS_ID) => {
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
+  return `${UTILITY_STORAGE_PREFIX}${targetMessId}_${cleanMonth}`;
+};
 
-// Seed initial default demo utility bills for local demo mode
-const getLocalUtilityBills = (monthId) => {
-  const key = getUtilityStorageKey(monthId);
+const getPaymentsStorageKey = (monthId, messId = DEFAULT_MESS_ID) => {
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
+  return `${RENT_PAYMENTS_STORAGE_PREFIX}${targetMessId}_${cleanMonth}`;
+};
+
+const getMemberRentsStorageKey = (monthId, messId = DEFAULT_MESS_ID) => {
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
+  return `${MEMBER_RENTS_STORAGE_PREFIX}${targetMessId}_${cleanMonth}`;
+};
+
+const getLocalUtilityBills = (monthId, messId = DEFAULT_MESS_ID) => {
+  const key = getUtilityStorageKey(monthId, messId);
   const stored = localStorage.getItem(key);
   if (!stored) {
-    const initialBills = [
-      { id: 'util_001', category: 'electricity', title: 'DESCO Prepaid Electricity', amount: 3200, date: `${monthId}-05`, note: 'Meter #48921', paidBy: 'Administrator', createdAt: new Date().toISOString() },
-      { id: 'util_002', category: 'internet', title: 'High-speed Fiber WiFi (50 Mbps)', amount: 1500, date: `${monthId}-03`, note: 'Monthly bill', paidBy: 'Administrator', createdAt: new Date().toISOString() },
-      { id: 'util_003', category: 'maid', title: 'Monthly Maid & Cooking Allowance', amount: 4000, date: `${monthId}-10`, note: 'Salary for full month', paidBy: 'Administrator', createdAt: new Date().toISOString() },
-      { id: 'util_004', category: 'waste', title: 'City Corporation Waste Collection', amount: 300, date: `${monthId}-01`, note: 'Van collector fee', paidBy: 'Administrator', createdAt: new Date().toISOString() },
-    ];
-    localStorage.setItem(key, JSON.stringify(initialBills));
-    return initialBills;
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
+    const legacyKey = `${UTILITY_STORAGE_PREFIX}${cleanMonth}`;
+    const legacyStored = localStorage.getItem(legacyKey);
+    if (legacyStored && (messId === DEFAULT_MESS_ID || !messId)) {
+      try { return JSON.parse(legacyStored); } catch (e) { return []; }
+    }
+    return [];
   }
   try { return JSON.parse(stored); } catch (e) { return []; }
 };
 
-const saveLocalUtilityBills = (monthId, bills) => {
-  localStorage.setItem(getUtilityStorageKey(monthId), JSON.stringify(bills));
+const saveLocalUtilityBills = (monthId, bills, messId = DEFAULT_MESS_ID) => {
+  localStorage.setItem(getUtilityStorageKey(monthId, messId), JSON.stringify(bills));
 };
 
-const getLocalRentPayments = (monthId) => {
-  const key = getPaymentsStorageKey(monthId);
+const getLocalRentPayments = (monthId, messId = DEFAULT_MESS_ID) => {
+  const key = getPaymentsStorageKey(monthId, messId);
   const stored = localStorage.getItem(key);
-  if (!stored) return [];
+  if (!stored) {
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
+    const legacyKey = `${RENT_PAYMENTS_STORAGE_PREFIX}${cleanMonth}`;
+    const legacyStored = localStorage.getItem(legacyKey);
+    if (legacyStored && (messId === DEFAULT_MESS_ID || !messId)) {
+      try { return JSON.parse(legacyStored); } catch (e) { return []; }
+    }
+    return [];
+  }
   try { return JSON.parse(stored); } catch (e) { return []; }
 };
 
-const saveLocalRentPayments = (monthId, payments) => {
-  localStorage.setItem(getPaymentsStorageKey(monthId), JSON.stringify(payments));
+const saveLocalRentPayments = (monthId, payments, messId = DEFAULT_MESS_ID) => {
+  localStorage.setItem(getPaymentsStorageKey(monthId, messId), JSON.stringify(payments));
 };
 
-const getLocalMemberRents = (monthId) => {
-  const key = getMemberRentsStorageKey(monthId);
+const getLocalMemberRents = (monthId, messId = DEFAULT_MESS_ID) => {
+  const key = getMemberRentsStorageKey(monthId, messId);
   const stored = localStorage.getItem(key);
-  if (!stored) return {};
+  if (!stored) {
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
+    const legacyKey = `${MEMBER_RENTS_STORAGE_PREFIX}${cleanMonth}`;
+    const legacyStored = localStorage.getItem(legacyKey);
+    if (legacyStored && (messId === DEFAULT_MESS_ID || !messId)) {
+      try { return JSON.parse(legacyStored); } catch (e) { return {}; }
+    }
+    return {};
+  }
   try { return JSON.parse(stored); } catch (e) { return {}; }
 };
 
-const saveLocalMemberRents = (monthId, rents) => {
-  localStorage.setItem(getMemberRentsStorageKey(monthId), JSON.stringify(rents));
+const saveLocalMemberRents = (monthId, rents, messId = DEFAULT_MESS_ID) => {
+  localStorage.setItem(getMemberRentsStorageKey(monthId, messId), JSON.stringify(rents));
 };
 
 export const rentUtilityService = {
   /**
    * Real-time subscription to monthly utility bills
    */
-  subscribeUtilityBills(monthId, callback) {
+  subscribeUtilityBills(monthId, callback, messId) {
     if (!monthId) return () => {};
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const load = () => callback(getLocalUtilityBills(monthId));
+      const load = () => callback(getLocalUtilityBills(cleanMonth, targetMessId));
       load();
       window.addEventListener('storage', load);
       return () => window.removeEventListener('storage', load);
     }
 
-    const billsRef = collection(db, 'months', monthId, 'utilityBills');
+    const billsRef = getMessCollection(targetMessId, 'months', cleanMonth, 'utilityBills');
     const q = query(billsRef, orderBy('date', 'desc'));
 
     return onSnapshot(q, (snapshot) => {
-      const bills = snapshot.docs.map(d => sanitizeUtilityBill(d.id, d.data()));
-      callback(bills);
+      if (!snapshot.empty) {
+        const bills = snapshot.docs.map(d => sanitizeUtilityBill(d.id, d.data()));
+        saveLocalUtilityBills(cleanMonth, bills, targetMessId);
+        callback(bills);
+        return;
+      }
+
+      if (targetMessId === DEFAULT_MESS_ID) {
+        getDocs(query(getRootCollection('months', cleanMonth, 'utilityBills'), orderBy('date', 'desc')))
+          .then((rootSnap) => {
+            if (!rootSnap.empty) {
+              const rootBills = rootSnap.docs.map(d => sanitizeUtilityBill(d.id, d.data()));
+              saveLocalUtilityBills(cleanMonth, rootBills, DEFAULT_MESS_ID);
+              callback(rootBills);
+            } else {
+              callback([]);
+            }
+          })
+          .catch(() => callback(getLocalUtilityBills(cleanMonth, targetMessId)));
+        return;
+      }
+
+      callback([]);
     }, (error) => {
-      console.error(`Error subscribing to utility bills for month ${monthId}:`, error);
-      callback(getLocalUtilityBills(monthId));
+      console.error(`Error subscribing to utility bills for month ${cleanMonth}:`, error);
+      callback(getLocalUtilityBills(cleanMonth, targetMessId));
     });
   },
 
   /**
    * Real-time subscription to monthly rent payments
    */
-  subscribeRentPayments(monthId, callback) {
+  subscribeRentPayments(monthId, callback, messId) {
     if (!monthId) return () => {};
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const load = () => callback(getLocalRentPayments(monthId));
+      const load = () => callback(getLocalRentPayments(cleanMonth, targetMessId));
       load();
       window.addEventListener('storage', load);
       return () => window.removeEventListener('storage', load);
     }
 
-    const paymentsRef = collection(db, 'months', monthId, 'rentPayments');
+    const paymentsRef = getMessCollection(targetMessId, 'months', cleanMonth, 'rentPayments');
     const q = query(paymentsRef, orderBy('date', 'desc'));
 
     return onSnapshot(q, (snapshot) => {
-      const payments = snapshot.docs.map(d => sanitizeRentPayment(d.id, d.data()));
-      callback(payments);
+      if (!snapshot.empty) {
+        const payments = snapshot.docs.map(d => sanitizeRentPayment(d.id, d.data()));
+        saveLocalRentPayments(cleanMonth, payments, targetMessId);
+        callback(payments);
+        return;
+      }
+
+      if (targetMessId === DEFAULT_MESS_ID) {
+        getDocs(query(getRootCollection('months', cleanMonth, 'rentPayments'), orderBy('date', 'desc')))
+          .then((rootSnap) => {
+            if (!rootSnap.empty) {
+              const rootPayments = rootSnap.docs.map(d => sanitizeRentPayment(d.id, d.data()));
+              saveLocalRentPayments(cleanMonth, rootPayments, DEFAULT_MESS_ID);
+              callback(rootPayments);
+            } else {
+              callback([]);
+            }
+          })
+          .catch(() => callback(getLocalRentPayments(cleanMonth, targetMessId)));
+        return;
+      }
+
+      callback([]);
     }, (error) => {
-      console.error(`Error subscribing to rent payments for month ${monthId}:`, error);
-      callback(getLocalRentPayments(monthId));
+      console.error(`Error subscribing to rent payments for month ${cleanMonth}:`, error);
+      callback(getLocalRentPayments(cleanMonth, targetMessId));
     });
   },
 
   /**
    * Real-time subscription to monthly member rents configuration
    */
-  subscribeMemberRents(monthId, callback) {
+  subscribeMemberRents(monthId, callback, messId) {
     if (!monthId) return () => {};
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const load = () => callback(getLocalMemberRents(monthId));
+      const load = () => callback(getLocalMemberRents(cleanMonth, targetMessId));
       load();
       window.addEventListener('storage', load);
       return () => window.removeEventListener('storage', load);
     }
 
-    const docRef = doc(db, 'months', monthId, 'config', 'memberRents');
+    const docRef = getMessDoc(targetMessId, 'months', cleanMonth, 'config', 'memberRents');
     return onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
-        callback(snapshot.data()?.rents || {});
-      } else {
-        callback({});
+        const data = snapshot.data()?.rents || {};
+        saveLocalMemberRents(cleanMonth, data, targetMessId);
+        callback(data);
+        return;
       }
+
+      if (targetMessId === DEFAULT_MESS_ID) {
+        getDoc(getRootDoc('months', cleanMonth, 'config', 'memberRents'))
+          .then((rootSnap) => {
+            if (rootSnap.exists()) {
+              const rootData = rootSnap.data()?.rents || {};
+              saveLocalMemberRents(cleanMonth, rootData, DEFAULT_MESS_ID);
+              callback(rootData);
+            } else {
+              callback({});
+            }
+          })
+          .catch(() => callback(getLocalMemberRents(cleanMonth, targetMessId)));
+        return;
+      }
+
+      callback({});
     }, (error) => {
-      console.error(`Error subscribing to member rents for month ${monthId}:`, error);
-      callback(getLocalMemberRents(monthId));
+      console.error(`Error subscribing to member rents for month ${cleanMonth}:`, error);
+      callback(getLocalMemberRents(cleanMonth, targetMessId));
     });
   },
 
   /**
    * Save member rents configuration map { [memberId]: amount }
    */
-  async saveMemberRents(monthId, rentsMap) {
+  async saveMemberRents(monthId, rentsMap, messId) {
     if (!monthId) throw new Error('Month ID is required.');
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      saveLocalMemberRents(monthId, rentsMap);
+      saveLocalMemberRents(cleanMonth, rentsMap, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return rentsMap;
     }
 
     try {
-      const docRef = doc(db, 'months', monthId, 'config', 'memberRents');
-      await setDoc(docRef, { rents: rentsMap, updatedAt: new Date().toISOString() }, { merge: true });
+      await setMessDocData(targetMessId, ['months', cleanMonth, 'config', 'memberRents'], {
+        rents: rentsMap,
+        updatedAt: new Date().toISOString()
+      });
       return rentsMap;
     } catch (err) {
       console.error('Error saving member rents:', err);
@@ -173,22 +282,23 @@ export const rentUtilityService = {
   /**
    * Add a utility bill
    */
-  async addUtilityBill(monthId, billData, user = null) {
+  async addUtilityBill(monthId, billData, user = null, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
     const model = createUtilityBillModel(billData, user);
 
     if (!isFirebaseConfigured()) {
-      const bills = getLocalUtilityBills(monthId);
+      const bills = getLocalUtilityBills(cleanMonth, targetMessId);
       const newId = `util_${Date.now()}`;
       const created = { id: newId, ...model };
       bills.unshift(created);
-      saveLocalUtilityBills(monthId, bills);
+      saveLocalUtilityBills(cleanMonth, bills, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return created;
     }
 
     try {
-      const colRef = collection(db, 'months', monthId, 'utilityBills');
-      const docRef = await addDoc(colRef, model);
+      const docRef = await addMessDocData(targetMessId, ['months', cleanMonth, 'utilityBills'], model);
       return { id: docRef.id, ...model };
     } catch (err) {
       console.error('Error adding utility bill:', err);
@@ -199,15 +309,17 @@ export const rentUtilityService = {
   /**
    * Update a utility bill
    */
-  async updateUtilityBill(monthId, billId, billData) {
+  async updateUtilityBill(monthId, billId, billData, messId) {
     if (!monthId || !billId) throw new Error('Month and Bill ID required.');
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const bills = getLocalUtilityBills(monthId);
+      const bills = getLocalUtilityBills(cleanMonth, targetMessId);
       const idx = bills.findIndex(b => b.id === billId);
       if (idx !== -1) {
         bills[idx] = { ...bills[idx], ...billData, amount: Number(billData.amount), updatedAt: new Date().toISOString() };
-        saveLocalUtilityBills(monthId, bills);
+        saveLocalUtilityBills(cleanMonth, bills, targetMessId);
         window.dispatchEvent(new Event('storage'));
         return bills[idx];
       }
@@ -215,9 +327,8 @@ export const rentUtilityService = {
     }
 
     try {
-      const docRef = doc(db, 'months', monthId, 'utilityBills', billId);
       const payload = { ...billData, amount: Number(billData.amount), updatedAt: new Date().toISOString() };
-      await updateDoc(docRef, payload);
+      await updateMessDocData(targetMessId, ['months', cleanMonth, 'utilityBills', billId], payload);
       return { id: billId, ...payload };
     } catch (err) {
       console.error('Error updating utility bill:', err);
@@ -228,20 +339,21 @@ export const rentUtilityService = {
   /**
    * Delete a utility bill
    */
-  async deleteUtilityBill(monthId, billId) {
+  async deleteUtilityBill(monthId, billId, messId) {
     if (!monthId || !billId) throw new Error('Month and Bill ID required.');
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const bills = getLocalUtilityBills(monthId);
+      const bills = getLocalUtilityBills(cleanMonth, targetMessId);
       const filtered = bills.filter(b => b.id !== billId);
-      saveLocalUtilityBills(monthId, filtered);
+      saveLocalUtilityBills(cleanMonth, filtered, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return { success: true };
     }
 
     try {
-      const docRef = doc(db, 'months', monthId, 'utilityBills', billId);
-      await deleteDoc(docRef);
+      await deleteMessDocData(targetMessId, ['months', cleanMonth, 'utilityBills', billId]);
       return { success: true };
     } catch (err) {
       console.error('Error deleting utility bill:', err);
@@ -252,22 +364,23 @@ export const rentUtilityService = {
   /**
    * Record a member rent & utility payment
    */
-  async addRentPayment(monthId, paymentData, user = null) {
+  async addRentPayment(monthId, paymentData, user = null, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
     const model = createRentPaymentModel(paymentData, user);
 
     if (!isFirebaseConfigured()) {
-      const payments = getLocalRentPayments(monthId);
+      const payments = getLocalRentPayments(cleanMonth, targetMessId);
       const newId = `rentpay_${Date.now()}`;
       const created = { id: newId, ...model };
       payments.unshift(created);
-      saveLocalRentPayments(monthId, payments);
+      saveLocalRentPayments(cleanMonth, payments, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return created;
     }
 
     try {
-      const colRef = collection(db, 'months', monthId, 'rentPayments');
-      const docRef = await addDoc(colRef, model);
+      const docRef = await addMessDocData(targetMessId, ['months', cleanMonth, 'rentPayments'], model);
       return { id: docRef.id, ...model };
     } catch (err) {
       console.error('Error recording rent payment:', err);
@@ -278,15 +391,17 @@ export const rentUtilityService = {
   /**
    * Update rent payment
    */
-  async updateRentPayment(monthId, paymentId, paymentData) {
+  async updateRentPayment(monthId, paymentId, paymentData, messId) {
     if (!monthId || !paymentId) throw new Error('Month and Payment ID required.');
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const payments = getLocalRentPayments(monthId);
+      const payments = getLocalRentPayments(cleanMonth, targetMessId);
       const idx = payments.findIndex(p => p.id === paymentId);
       if (idx !== -1) {
         payments[idx] = { ...payments[idx], ...paymentData, amount: Number(paymentData.amount), updatedAt: new Date().toISOString() };
-        saveLocalRentPayments(monthId, payments);
+        saveLocalRentPayments(cleanMonth, payments, targetMessId);
         window.dispatchEvent(new Event('storage'));
         return payments[idx];
       }
@@ -294,9 +409,8 @@ export const rentUtilityService = {
     }
 
     try {
-      const docRef = doc(db, 'months', monthId, 'rentPayments', paymentId);
       const payload = { ...paymentData, amount: Number(paymentData.amount), updatedAt: new Date().toISOString() };
-      await updateDoc(docRef, payload);
+      await updateMessDocData(targetMessId, ['months', cleanMonth, 'rentPayments', paymentId], payload);
       return { id: paymentId, ...payload };
     } catch (err) {
       console.error('Error updating rent payment:', err);
@@ -307,20 +421,21 @@ export const rentUtilityService = {
   /**
    * Delete rent payment
    */
-  async deleteRentPayment(monthId, paymentId) {
+  async deleteRentPayment(monthId, paymentId, messId) {
     if (!monthId || !paymentId) throw new Error('Month and Payment ID required.');
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const payments = getLocalRentPayments(monthId);
+      const payments = getLocalRentPayments(cleanMonth, targetMessId);
       const filtered = payments.filter(p => p.id !== paymentId);
-      saveLocalRentPayments(monthId, filtered);
+      saveLocalRentPayments(cleanMonth, filtered, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return { success: true };
     }
 
     try {
-      const docRef = doc(db, 'months', monthId, 'rentPayments', paymentId);
-      await deleteDoc(docRef);
+      await deleteMessDocData(targetMessId, ['months', cleanMonth, 'rentPayments', paymentId]);
       return { success: true };
     } catch (err) {
       console.error('Error deleting rent payment:', err);

@@ -5,30 +5,37 @@ import {
   getDocs,
   getDoc,
   setDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
   onSnapshot,
   query,
   orderBy,
   isFirebaseConfigured
 } from './firebase';
+import {
+  getMessCollection,
+  getMessDoc,
+  getRootCollection,
+  getRootDoc,
+  setMessDocData,
+  updateMessDocData,
+  deleteMessDocData
+} from './dbPaths';
 import { createMemberModel, sanitizeMember } from '../models/memberModel';
-import { DEFAULT_MESS_ID } from '../models/messModel';
+import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
 const COLLECTION_NAME = 'members';
 const LOCAL_STORAGE_KEY = 'mms_members_local';
 
 export const getLocalMembers = (messId = DEFAULT_MESS_ID) => {
-  const stored = localStorage.getItem(`${LOCAL_STORAGE_KEY}_${messId}`) || localStorage.getItem(LOCAL_STORAGE_KEY);
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  const stored = localStorage.getItem(`${LOCAL_STORAGE_KEY}_${targetMessId}`) || localStorage.getItem(LOCAL_STORAGE_KEY);
   if (!stored) {
     return [];
   }
   try {
     const parsed = JSON.parse(stored);
     return parsed.filter(m => {
-      if (messId === DEFAULT_MESS_ID) return !m.messId || m.messId === DEFAULT_MESS_ID;
-      return m.messId === messId;
+      if (targetMessId === DEFAULT_MESS_ID) return !m.messId || m.messId === DEFAULT_MESS_ID;
+      return m.messId === targetMessId;
     });
   } catch (e) {
     return [];
@@ -36,161 +43,225 @@ export const getLocalMembers = (messId = DEFAULT_MESS_ID) => {
 };
 
 const saveLocalMembers = (members, messId = DEFAULT_MESS_ID) => {
-  localStorage.setItem(`${LOCAL_STORAGE_KEY}_${messId}`, JSON.stringify(members));
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  localStorage.setItem(`${LOCAL_STORAGE_KEY}_${targetMessId}`, JSON.stringify(members));
 };
 
 export const memberService = {
   /**
-   * Subscribe to real-time member updates from Cloud Firestore
+   * Subscribe to real-time member updates for a specific mess
    */
-  subscribeMembers(callback, messId = DEFAULT_MESS_ID) {
+  subscribeMembers(callback, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+
     if (!isFirebaseConfigured()) {
-      const load = () => callback(getLocalMembers(messId));
+      const load = () => callback(getLocalMembers(targetMessId));
       load();
       window.addEventListener('storage', load);
       return () => window.removeEventListener('storage', load);
     }
 
-    const membersRef = collection(db, COLLECTION_NAME);
+    const membersRef = getMessCollection(targetMessId, COLLECTION_NAME);
     const q = query(membersRef, orderBy('name', 'asc'));
 
     return onSnapshot(q, (snapshot) => {
-      const allMembers = snapshot.docs.map(d => sanitizeMember(d.id, d.data()));
-      const filtered = allMembers.filter(m => {
-        if (messId === DEFAULT_MESS_ID) {
-          return !m.messId || m.messId === DEFAULT_MESS_ID;
-        }
-        return m.messId === messId;
-      });
-      callback(filtered);
+      // If tenant path has members, return them
+      if (!snapshot.empty) {
+        const members = snapshot.docs.map(d => sanitizeMember(d.id, { ...d.data(), messId: targetMessId }));
+        saveLocalMembers(members, targetMessId);
+        callback(members);
+        return;
+      }
+
+      // If Khadok Mess and tenant collection is empty, check root as non-destructive fallback
+      if (targetMessId === DEFAULT_MESS_ID) {
+        getDocs(query(getRootCollection(COLLECTION_NAME), orderBy('name', 'asc')))
+          .then((rootSnap) => {
+            if (!rootSnap.empty) {
+              const rootMembers = rootSnap.docs.map(d => sanitizeMember(d.id, { ...d.data(), messId: DEFAULT_MESS_ID }));
+              saveLocalMembers(rootMembers, DEFAULT_MESS_ID);
+              callback(rootMembers);
+            } else {
+              callback([]);
+            }
+          })
+          .catch(() => callback(getLocalMembers(targetMessId)));
+        return;
+      }
+
+      callback([]);
     }, (error) => {
-      console.warn('Firestore listener fallback to local:', error);
-      callback(getLocalMembers(messId));
+      console.warn('Firestore member listener fallback to local:', error);
+      callback(getLocalMembers(targetMessId));
     });
   },
 
   /**
-   * Fetch all members once
+   * Fetch all members for a mess once
    */
-  async getMembers(messId = DEFAULT_MESS_ID) {
+  async getMembers(messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+
     if (!isFirebaseConfigured()) {
-      return getLocalMembers(messId);
+      return getLocalMembers(targetMessId);
     }
     try {
-      const membersRef = collection(db, COLLECTION_NAME);
+      const membersRef = getMessCollection(targetMessId, COLLECTION_NAME);
       const snapshot = await getDocs(membersRef);
-      const allMembers = snapshot.docs.map(d => sanitizeMember(d.id, d.data()));
-      if (messId === 'all' || messId === null) {
-        return allMembers;
+
+      if (!snapshot.empty) {
+        return snapshot.docs.map(d => sanitizeMember(d.id, { ...d.data(), messId: targetMessId }));
       }
-      return allMembers.filter(m => {
-        if (messId === DEFAULT_MESS_ID) {
-          return !m.messId || m.messId === DEFAULT_MESS_ID;
+
+      // Fallback for default mess
+      if (targetMessId === DEFAULT_MESS_ID) {
+        const rootSnap = await getDocs(getRootCollection(COLLECTION_NAME));
+        if (!rootSnap.empty) {
+          return rootSnap.docs.map(d => sanitizeMember(d.id, { ...d.data(), messId: DEFAULT_MESS_ID }));
         }
-        return m.messId === messId;
-      });
+      }
+
+      return [];
     } catch (err) {
       console.error('Error fetching members:', err);
-      return getLocalMembers(messId);
+      return getLocalMembers(targetMessId);
     }
   },
 
   /**
    * Fetch single member by ID
    */
-  async getMemberById(memberId) {
+  async getMemberById(memberId, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+
     if (!isFirebaseConfigured()) {
-      const members = getLocalMembers();
-      return members.find(m => m.id === memberId) || null;
+      const local = getLocalMembers(targetMessId);
+      return local.find(m => m.id === memberId) || null;
     }
+
     try {
-      const docRef = doc(db, COLLECTION_NAME, memberId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        return sanitizeMember(docSnap.id, docSnap.data());
+      const docRef = getMessDoc(targetMessId, COLLECTION_NAME, memberId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return sanitizeMember(snap.id, { ...snap.data(), messId: targetMessId });
       }
-      const local = getLocalMembers();
-      return local.find(m => m.id === memberId) || null;
+
+      if (targetMessId === DEFAULT_MESS_ID) {
+        const rootSnap = await getDoc(getRootDoc(COLLECTION_NAME, memberId));
+        if (rootSnap.exists()) {
+          return sanitizeMember(rootSnap.id, { ...rootSnap.data(), messId: DEFAULT_MESS_ID });
+        }
+      }
+
+      return null;
     } catch (err) {
-      console.error('Error fetching member:', err);
-      const local = getLocalMembers();
-      return local.find(m => m.id === memberId) || null;
+      console.error('Error fetching member by id:', err);
+      return null;
     }
   },
 
   /**
-   * Create new member or admin
+   * Create a new member in the designated mess
    */
-  async createMember(memberData, messId = DEFAULT_MESS_ID) {
-    const targetMessId = messId || memberData?.messId || DEFAULT_MESS_ID;
-    const newMemberModel = {
-      ...createMemberModel(memberData),
-      messId: targetMessId,
-    };
+  async createMember(memberData, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const model = createMemberModel(memberData);
+    model.messId = targetMessId;
 
     if (!isFirebaseConfigured()) {
-      const members = getLocalMembers(targetMessId);
+      const local = getLocalMembers(targetMessId);
       const newId = `member_${Date.now()}`;
-      const created = { id: newId, ...newMemberModel };
-      members.push(created);
-      saveLocalMembers(members, targetMessId);
+      const newMember = { id: newId, ...model };
+      local.push(newMember);
+      saveLocalMembers(local, targetMessId);
       window.dispatchEvent(new Event('storage'));
-      return created;
+      return newMember;
     }
 
     try {
-      const membersRef = collection(db, COLLECTION_NAME);
-      const docRef = await addDoc(membersRef, newMemberModel);
-      return { id: docRef.id, ...newMemberModel };
+      const memberId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      const memberPayload = { id: memberId, ...model };
+
+      // Dual-write: saves to messes/{targetMessId}/members/{memberId} (and root if Khadok)
+      await setMessDocData(targetMessId, [COLLECTION_NAME, memberId], memberPayload);
+
+      // Register user lookup if email provided
+      if (memberData.email) {
+        const cleanEmail = memberData.email.trim().toLowerCase();
+        try {
+          await setDoc(doc(db, 'users', cleanEmail), {
+            email: cleanEmail,
+            messId: targetMessId,
+            role: memberData.role || 'member',
+            memberId: memberId,
+            name: memberData.name || '',
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (uErr) {
+          console.warn('Could not register users directory mapping:', uErr);
+        }
+      }
+
+      return memberPayload;
     } catch (err) {
       console.error('Error creating member:', err);
-      throw new Error(err.message || 'Failed to create member record.');
+      throw new Error('Unable to create member. Please try again.');
     }
   },
 
   /**
    * Update existing member
    */
-  async updateMember(memberId, memberData) {
-    if (!memberId) throw new Error('Member ID is required.');
+  async updateMember(memberId, memberData, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
 
     if (!isFirebaseConfigured()) {
-      const members = getLocalMembers();
-      const index = members.findIndex(m => m.id === memberId);
+      const local = getLocalMembers(targetMessId);
+      const index = local.findIndex(m => m.id === memberId);
       if (index !== -1) {
-        members[index] = { ...members[index], ...memberData, updatedAt: new Date().toISOString() };
-        saveLocalMembers(members);
+        local[index] = { ...local[index], ...memberData, messId: targetMessId, updatedAt: new Date().toISOString() };
+        saveLocalMembers(local, targetMessId);
         window.dispatchEvent(new Event('storage'));
-        return members[index];
+        return local[index];
       }
       throw new Error('Member not found.');
     }
 
     try {
-      const docRef = doc(db, COLLECTION_NAME, memberId);
-      const updatePayload = {
+      const payload = {
         ...memberData,
-        updatedAt: new Date().toISOString(),
+        messId: targetMessId,
+        updatedAt: new Date().toISOString()
       };
-      await setDoc(docRef, updatePayload, { merge: true });
-      return { id: memberId, ...updatePayload };
+
+      await updateMessDocData(targetMessId, [COLLECTION_NAME, memberId], payload);
+      return { id: memberId, ...payload };
     } catch (err) {
       console.error('Error updating member:', err);
-      throw new Error('Unable to update member details.');
+      throw new Error('Unable to update member.');
     }
   },
 
   /**
-   * Soft deactivate member (status: 'inactive')
+   * Delete member
    */
-  async deactivateMember(memberId) {
-    return this.updateMember(memberId, { status: 'inactive' });
-  },
+  async deleteMember(memberId, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
 
-  /**
-   * Activate member (status: 'active')
-   */
-  async activateMember(memberId) {
-    return this.updateMember(memberId, { status: 'active' });
-  },
+    if (!isFirebaseConfigured()) {
+      const local = getLocalMembers(targetMessId);
+      const filtered = local.filter(m => m.id !== memberId);
+      saveLocalMembers(filtered, targetMessId);
+      window.dispatchEvent(new Event('storage'));
+      return { success: true };
+    }
+
+    try {
+      await deleteMessDocData(targetMessId, [COLLECTION_NAME, memberId]);
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting member:', err);
+      throw new Error('Unable to delete member.');
+    }
+  }
 };

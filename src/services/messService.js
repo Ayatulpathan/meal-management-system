@@ -179,6 +179,10 @@ export const messService = {
 
     if (isFirebaseConfigured()) {
       try {
+        // Create root tenant document messes/{newMess.id}
+        await setDoc(doc(db, 'messes', newMess.id), newMess, { merge: true });
+
+        // Register in messes directory index
         const docRef = doc(db, 'settings', SETTINGS_DOC_ID);
         await setDoc(docRef, {
           messes: messesMap,

@@ -7,6 +7,25 @@ export const DEFAULT_MESS_NAME = 'Khadok Mess';
 export const DEFAULT_INVITE_CODE = 'KHD101';
 
 /**
+ * Returns the currently active Mess ID from storage or defaults to khadok-mess
+ */
+export const getActiveMessId = () => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    return window.localStorage.getItem('mms_active_mess_id') || DEFAULT_MESS_ID;
+  }
+  return DEFAULT_MESS_ID;
+};
+
+/**
+ * Persists the currently active Mess ID
+ */
+export const setActiveMessId = (messId) => {
+  if (typeof window !== 'undefined' && window.localStorage && messId) {
+    window.localStorage.setItem('mms_active_mess_id', messId);
+  }
+};
+
+/**
  * Generate a random 6-character uppercase alphanumeric invite code
  */
 export const generateInviteCode = (prefix = 'MESS') => {

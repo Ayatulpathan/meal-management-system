@@ -11,15 +11,24 @@ import {
   orderBy,
   isFirebaseConfigured
 } from './firebase';
+import {
+  getMessCollection,
+  getMessDoc,
+  getRootCollection,
+  getRootDoc,
+  setMessDocData,
+  updateMessDocData
+} from './dbPaths';
 import { createMonthModel, sanitizeMonth } from '../models/monthlyModel';
 import { getCurrentMonthId, getRecentMonthOptions } from '../utils/dateUtils';
-import { DEFAULT_MESS_ID } from '../models/messModel';
+import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
 const COLLECTION_NAME = 'months';
 const LOCAL_STORAGE_KEY = 'mms_months_local';
 
 const getLocalMonths = (messId = DEFAULT_MESS_ID) => {
-  const key = `${LOCAL_STORAGE_KEY}_${messId}`;
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  const key = `${LOCAL_STORAGE_KEY}_${targetMessId}`;
   const stored = localStorage.getItem(key);
   if (!stored) {
     const currentId = getCurrentMonthId();
@@ -38,143 +47,196 @@ const getLocalMonths = (messId = DEFAULT_MESS_ID) => {
 };
 
 const saveLocalMonths = (months, messId = DEFAULT_MESS_ID) => {
-  localStorage.setItem(`${LOCAL_STORAGE_KEY}_${messId}`, JSON.stringify(months));
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  localStorage.setItem(`${LOCAL_STORAGE_KEY}_${targetMessId}`, JSON.stringify(months));
 };
 
 export const monthService = {
   /**
    * Subscribe to list of months for a specific mess
    */
-  subscribeMonths(callback, messId = DEFAULT_MESS_ID) {
+  subscribeMonths(callback, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+
     if (!isFirebaseConfigured()) {
-      const load = () => callback(getLocalMonths(messId));
+      const load = () => callback(getLocalMonths(targetMessId));
       load();
       window.addEventListener('storage', load);
       return () => window.removeEventListener('storage', load);
     }
 
-    const monthsRef = collection(db, COLLECTION_NAME);
+    const monthsRef = getMessCollection(targetMessId, COLLECTION_NAME);
     const q = query(monthsRef, orderBy('month', 'desc'));
 
     return onSnapshot(q, (snapshot) => {
-      const allMonths = snapshot.docs.map(d => sanitizeMonth(d.id, d.data()));
-      // Filter by messId:
-      // For default Khadok Mess: include months without prefix or messId === 'khadok-mess'
-      // For other messes: include months with `${messId}_` prefix or messId === messId
-      const filtered = allMonths.filter(m => {
-        if (messId === DEFAULT_MESS_ID) {
-          return !m.id.includes('_') || m.messId === DEFAULT_MESS_ID;
-        }
-        return m.id.startsWith(`${messId}_`) || m.messId === messId;
-      }).map(m => {
-        // Normalize month string for UI display
-        const cleanMonth = m.id.includes('_') ? m.id.split('_').pop() : m.id;
-        return {
-          ...m,
-          month: cleanMonth,
-        };
-      });
+      if (!snapshot.empty) {
+        const months = snapshot.docs.map(d => sanitizeMonth(d.id, { ...d.data(), messId: targetMessId }));
+        saveLocalMonths(months, targetMessId);
+        callback(months);
+        return;
+      }
 
-      callback(filtered);
+      // If Khadok Mess and tenant collection is empty, check root as non-destructive fallback
+      if (targetMessId === DEFAULT_MESS_ID) {
+        getDocs(query(getRootCollection(COLLECTION_NAME), orderBy('month', 'desc')))
+          .then((rootSnap) => {
+            if (!rootSnap.empty) {
+              const rootMonths = rootSnap.docs
+                .filter(d => !d.id.includes('_'))
+                .map(d => sanitizeMonth(d.id, { ...d.data(), messId: DEFAULT_MESS_ID }));
+              saveLocalMonths(rootMonths, DEFAULT_MESS_ID);
+              callback(rootMonths);
+            } else {
+              callback([]);
+            }
+          })
+          .catch(() => callback(getLocalMonths(targetMessId)));
+        return;
+      }
+
+      callback([]);
     }, (error) => {
       console.error('Error subscribing to months:', error);
-      callback(getLocalMonths(messId));
+      callback(getLocalMonths(targetMessId));
     });
   },
 
   /**
    * Get all months for a mess
    */
-  async getMonths(messId = DEFAULT_MESS_ID) {
+  async getMonths(messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+
     if (!isFirebaseConfigured()) {
-      return getLocalMonths(messId);
+      return getLocalMonths(targetMessId);
     }
     try {
-      const monthsRef = collection(db, COLLECTION_NAME);
+      const monthsRef = getMessCollection(targetMessId, COLLECTION_NAME);
       const snapshot = await getDocs(monthsRef);
-      const all = snapshot.docs.map(d => sanitizeMonth(d.id, d.data()));
-      return all.filter(m => {
-        if (messId === DEFAULT_MESS_ID) {
-          return !m.id.includes('_') || m.messId === DEFAULT_MESS_ID;
+      if (!snapshot.empty) {
+        return snapshot.docs.map(d => sanitizeMonth(d.id, { ...d.data(), messId: targetMessId }));
+      }
+
+      if (targetMessId === DEFAULT_MESS_ID) {
+        const rootSnap = await getDocs(getRootCollection(COLLECTION_NAME));
+        if (!rootSnap.empty) {
+          return rootSnap.docs
+            .filter(d => !d.id.includes('_'))
+            .map(d => sanitizeMonth(d.id, { ...d.data(), messId: DEFAULT_MESS_ID }));
         }
-        return m.id.startsWith(`${messId}_`) || m.messId === messId;
-      });
+      }
+
+      return [];
     } catch (err) {
-      console.error('Error getting months:', err);
-      return getLocalMonths(messId);
+      console.error('Error fetching months:', err);
+      return getLocalMonths(targetMessId);
     }
   },
 
   /**
-   * Ensure a month document exists, creating it if not
+   * Get specific month by ID
    */
-  async ensureMonthExists(monthId, messId = DEFAULT_MESS_ID) {
-    if (!monthId) return null;
-    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
-    const docId = messId === DEFAULT_MESS_ID ? cleanMonth : `${messId}_${cleanMonth}`;
+  async getMonthById(monthId, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const months = getLocalMonths(messId);
-      let found = months.find(m => m.id === docId || m.month === cleanMonth);
-      if (!found) {
-        found = { id: docId, messId, ...createMonthModel(cleanMonth, 'open') };
-        months.unshift(found);
-        saveLocalMonths(months, messId);
-        window.dispatchEvent(new Event('storage'));
-      }
-      return found;
+      const local = getLocalMonths(targetMessId);
+      return local.find(m => m.month === cleanMonth || m.id === cleanMonth) || null;
     }
 
     try {
-      const docRef = doc(db, COLLECTION_NAME, docId);
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) {
-        const newMonth = {
-          ...createMonthModel(cleanMonth, 'open'),
-          messId,
-        };
-        await setDoc(docRef, newMonth);
-        return { id: docId, ...newMonth };
+      const docRef = getMessDoc(targetMessId, COLLECTION_NAME, cleanMonth);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return sanitizeMonth(snap.id, { ...snap.data(), messId: targetMessId });
       }
-      return sanitizeMonth(docSnap.id, docSnap.data());
+
+      if (targetMessId === DEFAULT_MESS_ID) {
+        const rootSnap = await getDoc(getRootDoc(COLLECTION_NAME, cleanMonth));
+        if (rootSnap.exists()) {
+          return sanitizeMonth(rootSnap.id, { ...rootSnap.data(), messId: DEFAULT_MESS_ID });
+        }
+      }
+
+      return null;
     } catch (err) {
-      console.error(`Error ensuring month ${docId}:`, err);
+      console.error('Error getting month by id:', err);
+      return null;
+    }
+  },
+
+  /**
+   * Ensure a month document exists in the mess database tree
+   */
+  async ensureMonthExists(monthId, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
+
+    if (!cleanMonth) return null;
+
+    if (!isFirebaseConfigured()) {
+      const local = getLocalMonths(targetMessId);
+      const existing = local.find(m => m.month === cleanMonth || m.id === cleanMonth);
+      if (existing) return existing;
+
+      const newMonth = createMonthModel(cleanMonth, 'open');
+      newMonth.messId = targetMessId;
+      local.unshift(newMonth);
+      saveLocalMonths(local, targetMessId);
+      window.dispatchEvent(new Event('storage'));
+      return newMonth;
+    }
+
+    try {
+      const docRef = getMessDoc(targetMessId, COLLECTION_NAME, cleanMonth);
+      const snap = await getDoc(docRef);
+
+      if (!snap.exists()) {
+        const model = createMonthModel(cleanMonth, 'open');
+        model.messId = targetMessId;
+
+        // Dual-write: saves to messes/{targetMessId}/months/{cleanMonth} (and root if Khadok)
+        await setMessDocData(targetMessId, [COLLECTION_NAME, cleanMonth], model);
+        return model;
+      }
+      return sanitizeMonth(snap.id, { ...snap.data(), messId: targetMessId });
+    } catch (err) {
+      console.error('Error ensuring month exists:', err);
       return createMonthModel(cleanMonth, 'open');
     }
   },
 
   /**
-   * Update month status ('open' or 'closed')
+   * Set month status (open or closed)
    */
-  async setMonthStatus(monthId, status, messId = DEFAULT_MESS_ID) {
-    const validStatus = status === 'closed' ? 'closed' : 'open';
-    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
-    const docId = messId === DEFAULT_MESS_ID ? cleanMonth : `${messId}_${cleanMonth}`;
+  async setMonthStatus(monthId, status, messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const months = getLocalMonths(messId);
-      const idx = months.findIndex(m => m.id === docId || m.month === cleanMonth);
-      if (idx !== -1) {
-        months[idx].status = validStatus;
-        months[idx].updatedAt = new Date().toISOString();
-      } else {
-        months.unshift({ id: docId, messId, ...createMonthModel(cleanMonth, validStatus) });
+      const local = getLocalMonths(targetMessId);
+      const index = local.findIndex(m => m.month === cleanMonth || m.id === cleanMonth);
+      if (index !== -1) {
+        local[index] = { ...local[index], status, updatedAt: new Date().toISOString() };
+        saveLocalMonths(local, targetMessId);
+        window.dispatchEvent(new Event('storage'));
+        return local[index];
       }
-      saveLocalMonths(months, messId);
-      window.dispatchEvent(new Event('storage'));
-      return { id: docId, status: validStatus };
+      throw new Error('Month record not found.');
     }
 
     try {
-      const docRef = doc(db, COLLECTION_NAME, docId);
-      await setDoc(docRef, {
-        status: validStatus,
-        messId,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
-      return { id: docId, status: validStatus };
+      const payload = {
+        status,
+        messId: targetMessId,
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateMessDocData(targetMessId, [COLLECTION_NAME, cleanMonth], payload);
+      return { id: cleanMonth, ...payload };
     } catch (err) {
-      console.error(`Error updating status for month ${docId}:`, err);
+      console.error('Error updating month status:', err);
       throw new Error('Unable to update month status.');
     }
   }

@@ -13,25 +13,37 @@ import {
   orderBy,
   isFirebaseConfigured
 } from './firebase';
+import {
+  getMessCollection,
+  getMessDoc,
+  getRootCollection,
+  getRootDoc,
+  addMessDocData,
+  updateMessDocData,
+  deleteMessDocData
+} from './dbPaths';
 import { createMarketCostModel, sanitizeMarketCost } from '../models/marketCostModel';
+import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
 const LOCAL_STORAGE_KEY_PREFIX = 'mms_market_';
 
-const getLocalKey = (monthId) => `${LOCAL_STORAGE_KEY_PREFIX}${monthId}`;
+const getLocalKey = (monthId, messId = DEFAULT_MESS_ID) => {
+  const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+  const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
+  return `${LOCAL_STORAGE_KEY_PREFIX}${targetMessId}_${cleanMonth}`;
+};
 
-const getLocalMarketCosts = (monthId) => {
-  const key = getLocalKey(monthId);
+const getLocalMarketCosts = (monthId, messId = DEFAULT_MESS_ID) => {
+  const key = getLocalKey(monthId, messId);
   const stored = localStorage.getItem(key);
   if (!stored) {
-    // Seed initial demo expenses totaling 30,000 for the sample month
-    const initialCosts = [
-      { id: 'cost_001', date: `${monthId}-02`, amount: 10000, description: 'Rice, Oil, Spices and Lentils', buyerName: 'Rahim Ahmed', createdBy: 'admin', createdAt: new Date().toISOString() },
-      { id: 'cost_002', date: `${monthId}-08`, amount: 8000, description: 'Chicken, Fish, and Fresh Vegetables', buyerName: 'Karim Ullah', createdBy: 'admin', createdAt: new Date().toISOString() },
-      { id: 'cost_003', date: `${monthId}-15`, amount: 7000, description: 'Beef, Onions, and Seasonings', buyerName: 'Hasan Mahmud', createdBy: 'admin', createdAt: new Date().toISOString() },
-      { id: 'cost_004', date: `${monthId}-22`, amount: 5000, description: 'Eggs, Potatoes, and Daily Groceries', buyerName: 'Administrator', createdBy: 'admin', createdAt: new Date().toISOString() },
-    ];
-    localStorage.setItem(key, JSON.stringify(initialCosts));
-    return initialCosts;
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
+    const legacyKey = `${LOCAL_STORAGE_KEY_PREFIX}${cleanMonth}`;
+    const legacyStored = localStorage.getItem(legacyKey);
+    if (legacyStored && (messId === DEFAULT_MESS_ID || !messId)) {
+      try { return JSON.parse(legacyStored); } catch (e) { return []; }
+    }
+    return [];
   }
   try {
     return JSON.parse(stored);
@@ -40,75 +52,114 @@ const getLocalMarketCosts = (monthId) => {
   }
 };
 
-const saveLocalMarketCosts = (monthId, costs) => {
-  localStorage.setItem(getLocalKey(monthId), JSON.stringify(costs));
+const saveLocalMarketCosts = (monthId, costs, messId = DEFAULT_MESS_ID) => {
+  localStorage.setItem(getLocalKey(monthId, messId), JSON.stringify(costs));
 };
 
 export const marketCostService = {
   /**
    * Subscribe to real-time market cost updates for a month
-   * Path: months/{monthId}/marketCosts
+   * Path: messes/{messId}/months/{monthId}/marketCosts
    */
-  subscribeMarketCosts(monthId, callback) {
+  subscribeMarketCosts(monthId, callback, messId) {
     if (!monthId) return () => {};
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const load = () => callback(getLocalMarketCosts(monthId));
+      const load = () => callback(getLocalMarketCosts(cleanMonth, targetMessId));
       load();
       window.addEventListener('storage', load);
       return () => window.removeEventListener('storage', load);
     }
 
-    const costsRef = collection(db, 'months', monthId, 'marketCosts');
+    const costsRef = getMessCollection(targetMessId, 'months', cleanMonth, 'marketCosts');
     const q = query(costsRef, orderBy('date', 'desc'));
 
     return onSnapshot(q, (snapshot) => {
-      const costs = snapshot.docs.map(d => sanitizeMarketCost(d.id, d.data()));
-      callback(costs);
+      if (!snapshot.empty) {
+        const costs = snapshot.docs.map(d => sanitizeMarketCost(d.id, d.data()));
+        saveLocalMarketCosts(cleanMonth, costs, targetMessId);
+        callback(costs);
+        return;
+      }
+
+      // If Khadok Mess and empty, fallback to root
+      if (targetMessId === DEFAULT_MESS_ID) {
+        getDocs(query(getRootCollection('months', cleanMonth, 'marketCosts'), orderBy('date', 'desc')))
+          .then((rootSnap) => {
+            if (!rootSnap.empty) {
+              const rootCosts = rootSnap.docs.map(d => sanitizeMarketCost(d.id, d.data()));
+              saveLocalMarketCosts(cleanMonth, rootCosts, DEFAULT_MESS_ID);
+              callback(rootCosts);
+            } else {
+              callback([]);
+            }
+          })
+          .catch(() => callback(getLocalMarketCosts(cleanMonth, targetMessId)));
+        return;
+      }
+
+      callback([]);
     }, (error) => {
-      console.error(`Error subscribing to market costs for month ${monthId}:`, error);
+      console.error(`Error subscribing to market costs for month ${cleanMonth}:`, error);
+      callback(getLocalMarketCosts(cleanMonth, targetMessId));
     });
   },
 
   /**
    * Fetch market costs once
    */
-  async getMarketCosts(monthId) {
+  async getMarketCosts(monthId, messId) {
     if (!monthId) return [];
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      return getLocalMarketCosts(monthId);
+      return getLocalMarketCosts(cleanMonth, targetMessId);
     }
 
     try {
-      const costsRef = collection(db, 'months', monthId, 'marketCosts');
+      const costsRef = getMessCollection(targetMessId, 'months', cleanMonth, 'marketCosts');
       const snapshot = await getDocs(costsRef);
-      return snapshot.docs.map(d => sanitizeMarketCost(d.id, d.data()));
+      if (!snapshot.empty) {
+        return snapshot.docs.map(d => sanitizeMarketCost(d.id, d.data()));
+      }
+
+      if (targetMessId === DEFAULT_MESS_ID) {
+        const rootSnap = await getDocs(getRootCollection('months', cleanMonth, 'marketCosts'));
+        if (!rootSnap.empty) {
+          return rootSnap.docs.map(d => sanitizeMarketCost(d.id, d.data()));
+        }
+      }
+
+      return [];
     } catch (err) {
-      console.error(`Error fetching market costs for month ${monthId}:`, err);
-      throw new Error('Unable to load market costs.');
+      console.error(`Error fetching market costs for month ${cleanMonth}:`, err);
+      return getLocalMarketCosts(cleanMonth, targetMessId);
     }
   },
 
   /**
    * Add new market cost
    */
-  async addMarketCost(monthId, costData, userId = 'admin') {
+  async addMarketCost(monthId, costData, userId = 'admin', messId) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = (monthId || '').includes('_') ? monthId.split('_').pop() : monthId;
     const model = createMarketCostModel(costData, userId);
 
     if (!isFirebaseConfigured()) {
-      const costs = getLocalMarketCosts(monthId);
+      const costs = getLocalMarketCosts(cleanMonth, targetMessId);
       const newId = `cost_${Date.now()}`;
       const created = { id: newId, ...model };
       costs.unshift(created);
-      saveLocalMarketCosts(monthId, costs);
+      saveLocalMarketCosts(cleanMonth, costs, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return created;
     }
 
     try {
-      const costsRef = collection(db, 'months', monthId, 'marketCosts');
-      const docRef = await addDoc(costsRef, model);
+      const docRef = await addMessDocData(targetMessId, ['months', cleanMonth, 'marketCosts'], model);
       return { id: docRef.id, ...model };
     } catch (err) {
       console.error('Error adding market cost:', err);
@@ -119,15 +170,17 @@ export const marketCostService = {
   /**
    * Update market cost
    */
-  async updateMarketCost(monthId, costId, costData) {
+  async updateMarketCost(monthId, costId, costData, messId) {
     if (!monthId || !costId) throw new Error('Month and Cost ID are required.');
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const costs = getLocalMarketCosts(monthId);
+      const costs = getLocalMarketCosts(cleanMonth, targetMessId);
       const index = costs.findIndex(c => c.id === costId);
       if (index !== -1) {
         costs[index] = { ...costs[index], ...costData, amount: Number(costData.amount), updatedAt: new Date().toISOString() };
-        saveLocalMarketCosts(monthId, costs);
+        saveLocalMarketCosts(cleanMonth, costs, targetMessId);
         window.dispatchEvent(new Event('storage'));
         return costs[index];
       }
@@ -135,13 +188,12 @@ export const marketCostService = {
     }
 
     try {
-      const docRef = doc(db, 'months', monthId, 'marketCosts', costId);
       const payload = {
         ...costData,
         amount: Number(costData.amount),
         updatedAt: new Date().toISOString(),
       };
-      await updateDoc(docRef, payload);
+      await updateMessDocData(targetMessId, ['months', cleanMonth, 'marketCosts', costId], payload);
       return { id: costId, ...payload };
     } catch (err) {
       console.error('Error updating market cost:', err);
@@ -152,20 +204,21 @@ export const marketCostService = {
   /**
    * Delete market cost
    */
-  async deleteMarketCost(monthId, costId) {
+  async deleteMarketCost(monthId, costId, messId) {
     if (!monthId || !costId) throw new Error('Month and Cost ID are required.');
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = monthId.includes('_') ? monthId.split('_').pop() : monthId;
 
     if (!isFirebaseConfigured()) {
-      const costs = getLocalMarketCosts(monthId);
+      const costs = getLocalMarketCosts(cleanMonth, targetMessId);
       const filtered = costs.filter(c => c.id !== costId);
-      saveLocalMarketCosts(monthId, filtered);
+      saveLocalMarketCosts(cleanMonth, filtered, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return { success: true };
     }
 
     try {
-      const docRef = doc(db, 'months', monthId, 'marketCosts', costId);
-      await deleteDoc(docRef);
+      await deleteMessDocData(targetMessId, ['months', cleanMonth, 'marketCosts', costId]);
       return { success: true };
     } catch (err) {
       console.error('Error deleting market cost:', err);

@@ -12,6 +12,7 @@ import {
   isFirebaseConfigured
 } from './firebase';
 import { getLocalMembers, memberService } from './memberService';
+import { DEFAULT_MESS_ID } from '../models/messModel';
 
 const USER_STORAGE_KEY = 'mms_active_user';
 
@@ -35,14 +36,16 @@ export const authService = {
           email: cleanEmail,
           displayName: 'Administrator',
           role: 'admin',
+          messId: DEFAULT_MESS_ID,
         };
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(adminUser));
+        localStorage.setItem('mms_active_mess_id', DEFAULT_MESS_ID);
         return { user: adminUser, error: null };
       }
     }
 
-    // Check against Firestore / Local Registered Members & Admins
-    const members = await memberService.getMembers();
+    // Check against Firestore / Local Registered Members & Admins across all messes
+    const members = await memberService.getMembers('all');
     const matchedMember = members.find(
       (m) => m.email && m.email.toLowerCase() === cleanEmail
     );
@@ -54,6 +57,7 @@ export const authService = {
 
       const expectedPassword = matchedMember.password || 'member123';
       if (cleanPassword === expectedPassword) {
+        const userMessId = matchedMember.messId || DEFAULT_MESS_ID;
         const user = {
           uid: matchedMember.id,
           memberId: matchedMember.id,
@@ -61,8 +65,10 @@ export const authService = {
           displayName: matchedMember.name,
           role: matchedMember.role || 'member',
           phone: matchedMember.phone,
+          messId: userMessId,
         };
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+        localStorage.setItem('mms_active_mess_id', userMessId);
         return { user, error: null };
       } else {
         return { user: null, error: 'Invalid password. Please check your credentials.' };

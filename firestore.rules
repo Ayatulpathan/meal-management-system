@@ -3,6 +3,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Multi-tenant Messes collection and all nested subcollections
+    match /messes/{messId} {
+      allow read, write: if true;
+
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
+    }
+
     // Members collection
     match /members/{memberId} {
       allow read, write: if true;

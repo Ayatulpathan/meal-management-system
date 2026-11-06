@@ -6,9 +6,9 @@ import { validateDeposit } from '../utils/validation';
 import { calculateTotalDeposits, calculateMemberTotalDeposit } from '../utils/calculations';
 
 export const useDeposits = (customMonthId = null) => {
-  const { selectedMonth, isClosed } = useMonthContext();
+  const { selectedMonth, monthDocId, isClosed } = useMonthContext();
   const { user, isAdmin, currentMemberId } = useAuthContext();
-  const activeMonthId = customMonthId || selectedMonth;
+  const activeMonthId = customMonthId || monthDocId || selectedMonth;
 
   const [deposits, setDeposits] = useState([]);
   const [loading, setLoading] = useState(true);

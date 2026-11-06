@@ -14,33 +14,38 @@ import {
   isFirebaseConfigured
 } from './firebase';
 import { createMemberModel, sanitizeMember } from '../models/memberModel';
+import { DEFAULT_MESS_ID } from '../models/messModel';
 
 const COLLECTION_NAME = 'members';
 const LOCAL_STORAGE_KEY = 'mms_members_local';
 
-export const getLocalMembers = () => {
-  const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+export const getLocalMembers = (messId = DEFAULT_MESS_ID) => {
+  const stored = localStorage.getItem(`${LOCAL_STORAGE_KEY}_${messId}`) || localStorage.getItem(LOCAL_STORAGE_KEY);
   if (!stored) {
     return [];
   }
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    return parsed.filter(m => {
+      if (messId === DEFAULT_MESS_ID) return !m.messId || m.messId === DEFAULT_MESS_ID;
+      return m.messId === messId;
+    });
   } catch (e) {
     return [];
   }
 };
 
-const saveLocalMembers = (members) => {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(members));
+const saveLocalMembers = (members, messId = DEFAULT_MESS_ID) => {
+  localStorage.setItem(`${LOCAL_STORAGE_KEY}_${messId}`, JSON.stringify(members));
 };
 
 export const memberService = {
   /**
    * Subscribe to real-time member updates from Cloud Firestore
    */
-  subscribeMembers(callback) {
+  subscribeMembers(callback, messId = DEFAULT_MESS_ID) {
     if (!isFirebaseConfigured()) {
-      const load = () => callback(getLocalMembers());
+      const load = () => callback(getLocalMembers(messId));
       load();
       window.addEventListener('storage', load);
       return () => window.removeEventListener('storage', load);
@@ -50,28 +55,43 @@ export const memberService = {
     const q = query(membersRef, orderBy('name', 'asc'));
 
     return onSnapshot(q, (snapshot) => {
-      const members = snapshot.docs.map(d => sanitizeMember(d.id, d.data()));
-      callback(members);
+      const allMembers = snapshot.docs.map(d => sanitizeMember(d.id, d.data()));
+      const filtered = allMembers.filter(m => {
+        if (messId === DEFAULT_MESS_ID) {
+          return !m.messId || m.messId === DEFAULT_MESS_ID;
+        }
+        return m.messId === messId;
+      });
+      callback(filtered);
     }, (error) => {
       console.warn('Firestore listener fallback to local:', error);
-      callback(getLocalMembers());
+      callback(getLocalMembers(messId));
     });
   },
 
   /**
    * Fetch all members once
    */
-  async getMembers() {
+  async getMembers(messId = DEFAULT_MESS_ID) {
     if (!isFirebaseConfigured()) {
-      return getLocalMembers();
+      return getLocalMembers(messId);
     }
     try {
       const membersRef = collection(db, COLLECTION_NAME);
       const snapshot = await getDocs(membersRef);
-      return snapshot.docs.map(d => sanitizeMember(d.id, d.data()));
+      const allMembers = snapshot.docs.map(d => sanitizeMember(d.id, d.data()));
+      if (messId === 'all' || messId === null) {
+        return allMembers;
+      }
+      return allMembers.filter(m => {
+        if (messId === DEFAULT_MESS_ID) {
+          return !m.messId || m.messId === DEFAULT_MESS_ID;
+        }
+        return m.messId === messId;
+      });
     } catch (err) {
       console.error('Error fetching members:', err);
-      return getLocalMembers();
+      return getLocalMembers(messId);
     }
   },
 
@@ -101,15 +121,19 @@ export const memberService = {
   /**
    * Create new member or admin
    */
-  async createMember(memberData) {
-    const newMemberModel = createMemberModel(memberData);
+  async createMember(memberData, messId = DEFAULT_MESS_ID) {
+    const targetMessId = messId || memberData?.messId || DEFAULT_MESS_ID;
+    const newMemberModel = {
+      ...createMemberModel(memberData),
+      messId: targetMessId,
+    };
 
     if (!isFirebaseConfigured()) {
-      const members = getLocalMembers();
+      const members = getLocalMembers(targetMessId);
       const newId = `member_${Date.now()}`;
       const created = { id: newId, ...newMemberModel };
       members.push(created);
-      saveLocalMembers(members);
+      saveLocalMembers(members, targetMessId);
       window.dispatchEvent(new Event('storage'));
       return created;
     }
@@ -119,13 +143,8 @@ export const memberService = {
       const docRef = await addDoc(membersRef, newMemberModel);
       return { id: docRef.id, ...newMemberModel };
     } catch (err) {
-      console.error('Error creating member on Firestore:', err);
-      const members = getLocalMembers();
-      const newId = `member_${Date.now()}`;
-      const created = { id: newId, ...newMemberModel };
-      members.push(created);
-      saveLocalMembers(members);
-      return created;
+      console.error('Error creating member:', err);
+      throw new Error(err.message || 'Failed to create member record.');
     }
   },
 

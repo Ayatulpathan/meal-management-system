@@ -6,9 +6,9 @@ import { validateMealValue } from '../utils/validation';
 import { calculateDailyMealTotals, calculateTotalMeals } from '../utils/calculations';
 
 export const useMeals = (customMonthId = null) => {
-  const { selectedMonth, currentMonthData, isClosed } = useMonthContext();
+  const { selectedMonth, monthDocId, currentMonthData, isClosed } = useMonthContext();
   const { isAdmin, currentMemberId } = useAuthContext();
-  const activeMonthId = customMonthId || selectedMonth;
+  const activeMonthId = customMonthId || monthDocId || selectedMonth;
 
   const [mealRecords, setMealRecords] = useState([]);
   const [loading, setLoading] = useState(true);

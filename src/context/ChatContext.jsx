@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useLocation } from 'react-router-dom';
 import { chatService } from '../services/chatService';
 import { useAuthContext } from './AuthContext';
+import { useMessContext } from './MessContext';
 
 const ChatContext = createContext(null);
 
@@ -9,6 +10,7 @@ const STORAGE_LAST_READ_KEY = 'mms_last_read_chat_time';
 
 export const ChatProvider = ({ children }) => {
   const { user, isAdmin } = useAuthContext();
+  const { currentMessId } = useMessContext();
   const location = useLocation();
 
   const [messages, setMessages] = useState([]);
@@ -21,7 +23,7 @@ export const ChatProvider = ({ children }) => {
 
   // Get stored last read timestamp
   const getStoredLastReadTime = () => {
-    const key = `${STORAGE_LAST_READ_KEY}_${currentUserId}`;
+    const key = `${STORAGE_LAST_READ_KEY}_${currentMessId}_${currentUserId}`;
     const stored = localStorage.getItem(key);
     return stored ? Number(stored) : Date.now();
   };
@@ -32,9 +34,9 @@ export const ChatProvider = ({ children }) => {
   const markAsRead = useCallback(() => {
     const now = Date.now();
     setLastReadTime(now);
-    const key = `${STORAGE_LAST_READ_KEY}_${currentUserId}`;
+    const key = `${STORAGE_LAST_READ_KEY}_${currentMessId}_${currentUserId}`;
     localStorage.setItem(key, String(now));
-  }, [currentUserId]);
+  }, [currentUserId, currentMessId]);
 
   // Subscribe to real-time messages
   useEffect(() => {
@@ -42,14 +44,14 @@ export const ChatProvider = ({ children }) => {
     const unsubscribe = chatService.subscribeMessages((incomingMessages) => {
       setMessages(incomingMessages);
       setLoading(false);
-    });
+    }, currentMessId);
 
     return () => {
       if (typeof unsubscribe === 'function') {
         unsubscribe();
       }
     };
-  }, []);
+  }, [currentMessId]);
 
   // When user visits /chat, automatically mark messages as read
   useEffect(() => {
@@ -84,7 +86,7 @@ export const ChatProvider = ({ children }) => {
         senderId,
         senderName,
         senderRole,
-      });
+      }, currentMessId);
 
       // Update our own read time on sending
       markAsRead();

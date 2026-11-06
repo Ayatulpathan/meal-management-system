@@ -13,6 +13,7 @@ import {
 import { sanitizeBDPhoneNumber, generateWhatsAppMessage } from '../utils/bazarNotificationUtils';
 import { bazarScheduleService } from './bazarScheduleService';
 import { getTodayDateString, getCurrentMonthId } from '../utils/dateUtils';
+import { DEFAULT_MESS_ID } from '../models/messModel';
 
 const CONFIG_STORAGE_KEY = 'mms_whatsapp_config';
 
@@ -41,10 +42,12 @@ const DEFAULT_CONFIG = {
 export const whatsappAutoService = {
   /**
    * Fetch current WhatsApp automation configuration
+   * @param {string} messId
    * @returns {Promise<Object>}
    */
-  async getConfig() {
-    const local = localStorage.getItem(CONFIG_STORAGE_KEY);
+  async getConfig(messId = DEFAULT_MESS_ID) {
+    const storageKey = (!messId || messId === DEFAULT_MESS_ID) ? CONFIG_STORAGE_KEY : `${CONFIG_STORAGE_KEY}_${messId}`;
+    const local = localStorage.getItem(storageKey);
     let cached = DEFAULT_CONFIG;
     if (local) {
       try {
@@ -59,11 +62,12 @@ export const whatsappAutoService = {
     }
 
     try {
-      const docRef = doc(db, 'settings', 'whatsappConfig');
+      const settingDoc = (!messId || messId === DEFAULT_MESS_ID) ? 'whatsappConfig' : `whatsappConfig_${messId}`;
+      const docRef = doc(db, 'settings', settingDoc);
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const firestoreConfig = { ...DEFAULT_CONFIG, ...snap.data() };
-        localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(firestoreConfig));
+        localStorage.setItem(storageKey, JSON.stringify(firestoreConfig));
         return firestoreConfig;
       }
       return cached;
@@ -76,23 +80,27 @@ export const whatsappAutoService = {
   /**
    * Save WhatsApp automation configuration to Firestore and LocalStorage
    * @param {Object} newConfig 
+   * @param {string} messId
    * @returns {Promise<Object>}
    */
-  async saveConfig(newConfig) {
+  async saveConfig(newConfig, messId = DEFAULT_MESS_ID) {
+    const storageKey = (!messId || messId === DEFAULT_MESS_ID) ? CONFIG_STORAGE_KEY : `${CONFIG_STORAGE_KEY}_${messId}`;
+    const settingDoc = (!messId || messId === DEFAULT_MESS_ID) ? 'whatsappConfig' : `whatsappConfig_${messId}`;
+
     const merged = {
       ...DEFAULT_CONFIG,
       ...newConfig,
       lastUpdated: new Date().toISOString(),
     };
 
-    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(merged));
+    localStorage.setItem(storageKey, JSON.stringify(merged));
 
     if (!isFirebaseConfigured()) {
       return { success: true, config: merged };
     }
 
     try {
-      const docRef = doc(db, 'settings', 'whatsappConfig');
+      const docRef = doc(db, 'settings', settingDoc);
       await setDoc(docRef, merged, { merge: true });
       return { success: true, config: merged };
     } catch (err) {

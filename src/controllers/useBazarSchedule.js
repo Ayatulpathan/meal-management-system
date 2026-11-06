@@ -11,9 +11,9 @@ import {
 import { whatsappAutoService } from '../services/whatsappAutoService';
 
 export const useBazarSchedule = (customMonthId = null) => {
-  const { selectedMonth, currentMonthData } = useMonthContext();
+  const { selectedMonth, monthDocId, currentMonthData } = useMonthContext();
   const { activeMembers } = useMembers();
-  const activeMonthId = customMonthId || selectedMonth || currentMonthData?.month || getCurrentMonthId();
+  const activeMonthId = customMonthId || monthDocId || selectedMonth || currentMonthData?.month || getCurrentMonthId();
 
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useMonthContext } from '../../context/MonthContext';
 import { useAuthContext } from '../../context/AuthContext';
+import { MessSelector } from './MessSelector';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
@@ -90,6 +91,7 @@ export const Header = ({ onMenuClick }) => {
         >
           <Menu className="w-5 h-5" />
         </button>
+        <MessSelector />
         <div className="hidden sm:block">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Active Accounting Period

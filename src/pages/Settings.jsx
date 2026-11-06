@@ -17,14 +17,19 @@ import {
   Zap,
   Info,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Building2,
+  Copy,
+  CheckCheck
 } from 'lucide-react';
 import { useMonthContext } from '../context/MonthContext';
 import { useAuthContext } from '../context/AuthContext';
+import { useMessContext } from '../context/MessContext';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { memberService } from '../services/memberService';
 import { authService } from '../services/authService';
+import { messService } from '../services/messService';
 import { isFirebaseConfigured } from '../services/firebase';
 import { whatsappAutoService, WHATSAPP_PROVIDERS } from '../services/whatsappAutoService';
 import { emailAutoService, EMAIL_PROVIDERS } from '../services/emailAutoService';
@@ -32,6 +37,19 @@ import { emailAutoService, EMAIL_PROVIDERS } from '../services/emailAutoService'
 export const Settings = () => {
   const { currentMonthData, isClosed, toggleMonthStatus } = useMonthContext();
   const { user } = useAuthContext();
+  const { currentMess, currentMessId } = useMessContext();
+
+  const [messNameInput, setMessNameInput] = useState(currentMess?.name || 'Khadok Mess');
+  const [messAddressInput, setMessAddressInput] = useState(currentMess?.address || '');
+  const [messSavedSuccess, setMessSavedSuccess] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+
+  useEffect(() => {
+    if (currentMess) {
+      setMessNameInput(currentMess.name || '');
+      setMessAddressInput(currentMess.address || '');
+    }
+  }, [currentMess]);
 
   const [appName, setAppName] = useState('MessHishab');
   const [currency, setCurrency] = useState('BDT (৳)');
@@ -88,7 +106,7 @@ export const Settings = () => {
 
   const fetchAdmins = async () => {
     try {
-      const allMembers = await memberService.getMembers();
+      const allMembers = await memberService.getMembers(currentMessId);
       const admins = allMembers.filter(m => m.role === 'admin' || (m.email && m.email.toLowerCase().includes('admin')));
       setAdminsList(admins);
     } catch (e) {
@@ -98,7 +116,7 @@ export const Settings = () => {
 
   const fetchWaConfig = async () => {
     try {
-      const cfg = await whatsappAutoService.getConfig();
+      const cfg = await whatsappAutoService.getConfig(currentMessId);
       setWaConfig(cfg);
       if (cfg.testPhone) setTestPhone(cfg.testPhone);
     } catch (e) {
@@ -108,7 +126,7 @@ export const Settings = () => {
 
   const fetchEmailConfig = async () => {
     try {
-      const cfg = await emailAutoService.getConfig();
+      const cfg = await emailAutoService.getConfig(currentMessId);
       setEmailConfig(cfg);
       if (cfg.testEmail) setTestEmailRecipient(cfg.testEmail);
       else if (user?.email) setTestEmailRecipient(user.email);
@@ -121,7 +139,7 @@ export const Settings = () => {
     fetchAdmins();
     fetchWaConfig();
     fetchEmailConfig();
-  }, []);
+  }, [currentMessId]);
 
   const handleSaveWaConfig = async (e) => {
     e.preventDefault();
@@ -132,7 +150,7 @@ export const Settings = () => {
       const res = await whatsappAutoService.saveConfig({
         ...waConfig,
         testPhone,
-      });
+      }, currentMessId);
       if (res.success) {
         setWaSaveSuccess('WhatsApp Automation settings updated and saved successfully!');
         setTimeout(() => setWaSaveSuccess(''), 4000);
@@ -185,7 +203,7 @@ export const Settings = () => {
       const res = await emailAutoService.saveConfig({
         ...emailConfig,
         testEmail: testEmailRecipient,
-      });
+      }, currentMessId);
       if (res.success) {
         setEmailSaveSuccess('Automated Email settings updated and saved successfully!');
         setTimeout(() => setEmailSaveSuccess(''), 4000);
@@ -296,6 +314,86 @@ export const Settings = () => {
           <span>Settings saved successfully.</span>
         </div>
       )}
+
+      {/* Active Mess Profile Card */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                Active Mess Profile: {currentMess?.name}
+              </h3>
+              <p className="text-xs text-slate-500">
+                Multi-tenant configuration, branch name, address, and member invite code
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+            <span className="text-xs font-bold text-emerald-800">Invite Code:</span>
+            <span className="font-mono font-black text-sm text-emerald-700 tracking-wider">
+              {currentMess?.inviteCode}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (currentMess?.inviteCode) {
+                  navigator.clipboard.writeText(currentMess.inviteCode);
+                  setCopiedInvite(true);
+                  setTimeout(() => setCopiedInvite(false), 2500);
+                }
+              }}
+              className="p-1 rounded-md hover:bg-emerald-100 text-emerald-700 transition-colors ml-1"
+              title="Copy Invite Code"
+            >
+              {copiedInvite ? <CheckCheck className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {messSavedSuccess && (
+          <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Mess details updated successfully!</span>
+          </div>
+        )}
+
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            await messService.updateMess(currentMessId, {
+              name: messNameInput.trim(),
+              address: messAddressInput.trim(),
+            });
+            setMessSavedSuccess(true);
+            setTimeout(() => setMessSavedSuccess(false), 3000);
+          }}
+          className="mt-4 space-y-4"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Mess Name"
+              value={messNameInput}
+              onChange={(e) => setMessNameInput(e.target.value)}
+              placeholder="e.g. Khadok Mess"
+              required
+            />
+            <Input
+              label="Mess Address / Location"
+              value={messAddressInput}
+              onChange={(e) => setMessAddressInput(e.target.value)}
+              placeholder="e.g. Dhaka, Bangladesh"
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button type="submit" variant="primary" size="sm">
+              Save Mess Profile
+            </Button>
+          </div>
+        </form>
+      </div>
 
       {/* Admin Management Section */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">

@@ -19,11 +19,13 @@ import {
 import { useAuthContext } from '../../context/AuthContext';
 import { useMonthContext } from '../../context/MonthContext';
 import { useChatContext } from '../../context/ChatContext';
+import { useMessContext } from '../../context/MessContext';
 
 export const Sidebar = ({ onClose }) => {
   const { logout, user, isAdmin, isMember } = useAuthContext();
   const { isClosed, currentMonthData } = useMonthContext();
   const { unreadCount } = useChatContext();
+  const { currentMess } = useMessContext();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -61,15 +63,15 @@ export const Sidebar = ({ onClose }) => {
     <aside className="flex flex-col h-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-300 w-64 select-none border-r border-slate-800/80 shadow-2xl">
       {/* Brand Header */}
       <div className="flex items-center gap-3.5 px-6 py-5.5 border-b border-slate-800/80 bg-slate-950/40">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 ring-1 ring-white/20">
+        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 ring-1 ring-white/20 shrink-0">
           <UtensilsCrossed className="w-5 h-5" />
         </div>
-        <div>
-          <h1 className="text-base font-extrabold text-white tracking-wide flex items-center gap-1.5">
-            MessHishab
+        <div className="min-w-0">
+          <h1 className="text-base font-extrabold text-white tracking-wide flex items-center gap-1.5 truncate">
+            {currentMess?.name || 'MessHishab'}
           </h1>
-          <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
-            <Sparkles className="w-3 h-3" /> {isMember ? 'Member Portal' : 'Admin Console'}
+          <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5 truncate">
+            <Sparkles className="w-3 h-3 shrink-0" /> {isMember ? 'Member' : 'Admin'} • Code: {currentMess?.inviteCode}
           </p>
         </div>
       </div>

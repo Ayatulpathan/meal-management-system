@@ -6,9 +6,9 @@ import { validateMarketCost } from '../utils/validation';
 import { calculateTotalMarketCost } from '../utils/calculations';
 
 export const useMarketCosts = (customMonthId = null) => {
-  const { selectedMonth, isClosed } = useMonthContext();
+  const { selectedMonth, monthDocId, isClosed } = useMonthContext();
   const { user, isAdmin, currentMemberId } = useAuthContext();
-  const activeMonthId = customMonthId || selectedMonth;
+  const activeMonthId = customMonthId || monthDocId || selectedMonth;
 
   const [marketCosts, setMarketCosts] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -13,11 +13,12 @@ import {
   serverTimestamp,
   isFirebaseConfigured
 } from './firebase';
+import { DEFAULT_MESS_ID } from '../models/messModel';
 
 const LOCAL_STORAGE_KEY = 'mms_chat_messages';
 
-const getLocalMessages = () => {
-  const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+const getLocalMessages = (messId = DEFAULT_MESS_ID) => {
+  const stored = localStorage.getItem(`${LOCAL_STORAGE_KEY}_${messId}`) || localStorage.getItem(LOCAL_STORAGE_KEY);
   if (!stored) {
     const initial = [
       {
@@ -26,6 +27,7 @@ const getLocalMessages = () => {
         senderId: 'admin',
         senderName: 'Administrator',
         senderRole: 'admin',
+        messId,
         createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
       },
       {
@@ -34,10 +36,11 @@ const getLocalMessages = () => {
         senderId: 'admin',
         senderName: 'Administrator',
         senderRole: 'admin',
+        messId,
         createdAt: new Date(Date.now() - 1800000).toISOString(),
       },
     ];
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initial));
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_${messId}`, JSON.stringify(initial));
     return initial;
   }
   try {
@@ -47,17 +50,17 @@ const getLocalMessages = () => {
   }
 };
 
-const saveLocalMessages = (messages) => {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(messages));
+const saveLocalMessages = (messages, messId = DEFAULT_MESS_ID) => {
+  localStorage.setItem(`${LOCAL_STORAGE_KEY}_${messId}`, JSON.stringify(messages));
 };
 
 export const chatService = {
   /**
-   * Subscribes to real-time chat messages
+   * Subscribes to real-time chat messages for a specific mess
    */
-  subscribeMessages(callback) {
+  subscribeMessages(callback, messId = DEFAULT_MESS_ID) {
     if (!isFirebaseConfigured()) {
-      const load = () => callback(getLocalMessages());
+      const load = () => callback(getLocalMessages(messId));
       load();
       window.addEventListener('storage', load);
       return () => window.removeEventListener('storage', load);
@@ -86,17 +89,27 @@ export const chatService = {
             senderId: data.senderId || 'unknown',
             senderName: data.senderName || 'Member',
             senderRole: data.senderRole || 'member',
+            messId: data.messId,
             createdAt: createdAtStr,
           };
         });
-        messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        callback(messages);
+
+        // Filter messages by messId
+        const filtered = messages.filter(m => {
+          if (messId === DEFAULT_MESS_ID) {
+            return !m.messId || m.messId === DEFAULT_MESS_ID;
+          }
+          return m.messId === messId;
+        });
+
+        filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        callback(filtered);
       }, (error) => {
         console.error('Error in chat real-time listener:', error);
       });
     } catch (err) {
       console.error('Chat subscription init error:', err);
-      callback(getLocalMessages());
+      callback(getLocalMessages(messId));
       return () => {};
     }
   },
@@ -104,7 +117,7 @@ export const chatService = {
   /**
    * Send a new chat message
    */
-  async sendMessage(messageData) {
+  async sendMessage(messageData, messId = DEFAULT_MESS_ID) {
     const { text, senderId, senderName, senderRole } = messageData;
     if (!text || !text.trim()) {
       throw new Error('Message text cannot be empty.');
@@ -115,19 +128,20 @@ export const chatService = {
       senderId: senderId || 'user',
       senderName: senderName || 'Member',
       senderRole: senderRole || 'member',
+      messId: messId || DEFAULT_MESS_ID,
       createdAt: isFirebaseConfigured() ? serverTimestamp() : new Date().toISOString(),
       createdAtIso: new Date().toISOString(),
     };
 
     if (!isFirebaseConfigured()) {
-      const messages = getLocalMessages();
+      const messages = getLocalMessages(messId);
       const newMsg = {
         id: `msg_${Date.now()}`,
         ...payload,
         createdAt: new Date().toISOString(),
       };
       messages.push(newMsg);
-      saveLocalMessages(messages);
+      saveLocalMessages(messages, messId);
       window.dispatchEvent(new Event('storage'));
       return newMsg;
     }
@@ -138,7 +152,7 @@ export const chatService = {
       return { id: docRef.id, ...payload, createdAt: payload.createdAtIso };
     } catch (err) {
       console.error('Error sending chat message to Firebase:', err);
-      throw err;
+      throw new Error('Failed to send chat message.');
     }
   },
 

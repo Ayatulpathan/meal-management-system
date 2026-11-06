@@ -6,9 +6,10 @@ import { useMembers } from './useMembers';
 import { calculateRentSummary } from '../utils/rentCalculations';
 
 export const useRentUtilities = () => {
-  const { selectedMonth, isClosed } = useMonthContext();
+  const { selectedMonth, monthDocId, isClosed } = useMonthContext();
   const { user, isAdmin } = useAuthContext();
   const { activeMembers, members, loading: membersLoading } = useMembers();
+  const targetMonthId = monthDocId || selectedMonth;
 
   const [utilityBills, setUtilityBills] = useState([]);
   const [rentPayments, setRentPayments] = useState([]);
@@ -19,7 +20,7 @@ export const useRentUtilities = () => {
 
   // Subscribe to real-time updates for the active month
   useEffect(() => {
-    if (!selectedMonth) return;
+    if (!targetMonthId) return;
     setLoading(true);
 
     let billsLoaded = false;
@@ -32,19 +33,19 @@ export const useRentUtilities = () => {
       }
     };
 
-    const unsubBills = rentUtilityService.subscribeUtilityBills(selectedMonth, (bills) => {
+    const unsubBills = rentUtilityService.subscribeUtilityBills(targetMonthId, (bills) => {
       setUtilityBills(bills);
       billsLoaded = true;
       checkReady();
     });
 
-    const unsubPayments = rentUtilityService.subscribeRentPayments(selectedMonth, (payments) => {
+    const unsubPayments = rentUtilityService.subscribeRentPayments(targetMonthId, (payments) => {
       setRentPayments(payments);
       paymentsLoaded = true;
       checkReady();
     });
 
-    const unsubRents = rentUtilityService.subscribeMemberRents(selectedMonth, (rents) => {
+    const unsubRents = rentUtilityService.subscribeMemberRents(targetMonthId, (rents) => {
       setMemberRentsMap(rents);
       rentsLoaded = true;
       checkReady();
@@ -55,7 +56,7 @@ export const useRentUtilities = () => {
       if (typeof unsubPayments === 'function') unsubPayments();
       if (typeof unsubRents === 'function') unsubRents();
     };
-  }, [selectedMonth]);
+  }, [targetMonthId]);
 
   // Compute calculated rent and utility summary
   const summary = useMemo(() => {
@@ -73,7 +74,7 @@ export const useRentUtilities = () => {
     setActionLoading(true);
     setError(null);
     try {
-      const res = await rentUtilityService.addUtilityBill(selectedMonth, billData, user);
+      const res = await rentUtilityService.addUtilityBill(targetMonthId, billData, user);
       return { success: true, data: res };
     } catch (err) {
       setError(err.message);
@@ -81,14 +82,14 @@ export const useRentUtilities = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [selectedMonth, isClosed, user]);
+  }, [targetMonthId, isClosed, user]);
 
   const updateUtilityBill = useCallback(async (billId, billData) => {
     if (isClosed) return { success: false, error: 'Month is closed (read-only).' };
     setActionLoading(true);
     setError(null);
     try {
-      const res = await rentUtilityService.updateUtilityBill(selectedMonth, billId, billData);
+      const res = await rentUtilityService.updateUtilityBill(targetMonthId, billId, billData);
       return { success: true, data: res };
     } catch (err) {
       setError(err.message);
@@ -96,14 +97,14 @@ export const useRentUtilities = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [selectedMonth, isClosed]);
+  }, [targetMonthId, isClosed]);
 
   const deleteUtilityBill = useCallback(async (billId) => {
     if (isClosed) return { success: false, error: 'Month is closed (read-only).' };
     setActionLoading(true);
     setError(null);
     try {
-      await rentUtilityService.deleteUtilityBill(selectedMonth, billId);
+      await rentUtilityService.deleteUtilityBill(targetMonthId, billId);
       return { success: true };
     } catch (err) {
       setError(err.message);
@@ -111,14 +112,14 @@ export const useRentUtilities = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [selectedMonth, isClosed]);
+  }, [targetMonthId, isClosed]);
 
   const addRentPayment = useCallback(async (paymentData) => {
     if (isClosed) return { success: false, error: 'Month is closed (read-only).' };
     setActionLoading(true);
     setError(null);
     try {
-      const res = await rentUtilityService.addRentPayment(selectedMonth, paymentData, user);
+      const res = await rentUtilityService.addRentPayment(targetMonthId, paymentData, user);
       return { success: true, data: res };
     } catch (err) {
       setError(err.message);
@@ -126,14 +127,14 @@ export const useRentUtilities = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [selectedMonth, isClosed, user]);
+  }, [targetMonthId, isClosed, user]);
 
   const updateRentPayment = useCallback(async (paymentId, paymentData) => {
     if (isClosed) return { success: false, error: 'Month is closed (read-only).' };
     setActionLoading(true);
     setError(null);
     try {
-      const res = await rentUtilityService.updateRentPayment(selectedMonth, paymentId, paymentData);
+      const res = await rentUtilityService.updateRentPayment(targetMonthId, paymentId, paymentData);
       return { success: true, data: res };
     } catch (err) {
       setError(err.message);
@@ -141,14 +142,14 @@ export const useRentUtilities = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [selectedMonth, isClosed]);
+  }, [targetMonthId, isClosed]);
 
   const deleteRentPayment = useCallback(async (paymentId) => {
     if (isClosed) return { success: false, error: 'Month is closed (read-only).' };
     setActionLoading(true);
     setError(null);
     try {
-      await rentUtilityService.deleteRentPayment(selectedMonth, paymentId);
+      await rentUtilityService.deleteRentPayment(targetMonthId, paymentId);
       return { success: true };
     } catch (err) {
       setError(err.message);
@@ -156,14 +157,14 @@ export const useRentUtilities = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [selectedMonth, isClosed]);
+  }, [targetMonthId, isClosed]);
 
   const saveMemberRents = useCallback(async (rentsMap) => {
     if (isClosed) return { success: false, error: 'Month is closed (read-only).' };
     setActionLoading(true);
     setError(null);
     try {
-      await rentUtilityService.saveMemberRents(selectedMonth, rentsMap);
+      await rentUtilityService.saveMemberRents(targetMonthId, rentsMap);
       return { success: true };
     } catch (err) {
       setError(err.message);
@@ -171,7 +172,7 @@ export const useRentUtilities = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [selectedMonth, isClosed]);
+  }, [targetMonthId, isClosed]);
 
   return {
     summary,

@@ -9,11 +9,17 @@ import {
   User, 
   Sparkles,
   Building2,
-  MessageSquare
+  MessageSquare,
+  KeyRound,
+  ShieldAlert,
+  Phone
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
+import { Modal } from '../components/common/Modal';
+import { messService } from '../services/messService';
+import { memberService } from '../services/memberService';
 
 export const Login = () => {
   const { login } = useAuthContext();
@@ -25,6 +31,26 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Multi-Mess modals state
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  // Create Mess Form fields
+  const [newMessName, setNewMessName] = useState('');
+  const [adminName, setAdminName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminPhone, setAdminPhone] = useState('');
+
+  // Join Mess Form fields
+  const [joinCode, setJoinCode] = useState('');
+  const [memberName, setMemberName] = useState('');
+  const [memberEmail, setMemberEmail] = useState('');
+  const [memberPassword, setMemberPassword] = useState('');
+  const [memberPhone, setMemberPhone] = useState('');
 
   const from = location.state?.from?.pathname;
 
@@ -53,6 +79,95 @@ export const Login = () => {
       setError(err.message || 'An error occurred during sign in.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateMessSubmit = async (e) => {
+    e.preventDefault();
+    setModalError('');
+    if (!newMessName.trim() || !adminEmail.trim() || !adminPassword.trim()) {
+      setModalError('Please fill in all required fields.');
+      return;
+    }
+
+    setModalLoading(true);
+    try {
+      // 1. Create the mess
+      const createdMess = await messService.createMess({
+        name: newMessName.trim(),
+        managerEmail: adminEmail.trim().toLowerCase(),
+        managerName: adminName.trim() || 'Mess Manager',
+        managerPhone: adminPhone.trim(),
+        currency: '৳',
+      });
+
+      // 2. Register the manager as admin member of that mess
+      await memberService.createMember({
+        name: adminName.trim() || 'Mess Manager',
+        email: adminEmail.trim().toLowerCase(),
+        password: adminPassword.trim(),
+        phone: adminPhone.trim(),
+        role: 'admin',
+        status: 'active',
+        messId: createdMess.id,
+      }, createdMess.id);
+
+      // 3. Immediately log in
+      const res = await login(adminEmail.trim(), adminPassword.trim());
+      if (res.success) {
+        setIsCreateOpen(false);
+        navigate('/dashboard', { replace: true });
+      } else {
+        setModalError(res.error || 'Mess created! Please log in above.');
+      }
+    } catch (err) {
+      setModalError(err.message || 'Failed to create new mess.');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleJoinMessSubmit = async (e) => {
+    e.preventDefault();
+    setModalError('');
+    if (!joinCode.trim() || !memberEmail.trim() || !memberPassword.trim() || !memberName.trim()) {
+      setModalError('Please fill in all required fields.');
+      return;
+    }
+
+    setModalLoading(true);
+    try {
+      // 1. Check if mess exists with this invite code
+      const targetMess = await messService.getMessByInviteCode(joinCode.trim().toUpperCase());
+      if (!targetMess) {
+        setModalError(`No mess found with invite code "${joinCode.trim().toUpperCase()}".`);
+        setModalLoading(false);
+        return;
+      }
+
+      // 2. Register member under this mess
+      await memberService.createMember({
+        name: memberName.trim(),
+        email: memberEmail.trim().toLowerCase(),
+        password: memberPassword.trim(),
+        phone: memberPhone.trim(),
+        role: 'member',
+        status: 'active',
+        messId: targetMess.id,
+      }, targetMess.id);
+
+      // 3. Immediately log in
+      const res = await login(memberEmail.trim(), memberPassword.trim());
+      if (res.success) {
+        setIsJoinOpen(false);
+        navigate('/portal', { replace: true });
+      } else {
+        setModalError(res.error || 'Joined successfully! Please log in above.');
+      }
+    } catch (err) {
+      setModalError(err.message || 'Failed to join mess.');
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -162,6 +277,37 @@ export const Login = () => {
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           </form>
+
+          {/* Multi-Mess Quick Actions */}
+          <div className="mt-6 pt-5 border-t border-slate-200/70">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center mb-3">
+              Need to setup or join another mess?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalError('');
+                  setIsCreateOpen(true);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 text-xs font-bold transition-all border border-slate-200/80 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                + Create Mess
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalError('');
+                  setIsJoinOpen(true);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-sky-50 hover:text-sky-700 text-slate-700 text-xs font-bold transition-all border border-slate-200/80 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-sky-600" />
+                Join with Code
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="mt-6 text-center">
@@ -170,6 +316,222 @@ export const Login = () => {
           </p>
         </div>
       </div>
+
+      {/* Modal: Create a New Mess */}
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title="Setup a New Mess"
+      >
+        <form onSubmit={handleCreateMessSubmit} className="space-y-3.5">
+          <p className="text-xs text-slate-500">
+            Create an independent dining, meal ledger, and rent management system for your mess or flat.
+          </p>
+
+          {modalError && (
+            <div className="p-3 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span>{modalError}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Mess / Apartment Name *
+            </label>
+            <Input
+              type="text"
+              placeholder="e.g. Dhanmondi Flat 4B Mess"
+              value={newMessName}
+              onChange={(e) => setNewMessName(e.target.value)}
+              prefix={<Building2 className="w-4 h-4" />}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Manager / Admin Name *
+            </label>
+            <Input
+              type="text"
+              placeholder="e.g. Tanvir Rahman"
+              value={adminName}
+              onChange={(e) => setAdminName(e.target.value)}
+              prefix={<User className="w-4 h-4" />}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Admin Email *
+            </label>
+            <Input
+              type="email"
+              placeholder="e.g. tanvir@gmail.com"
+              value={adminEmail}
+              onChange={(e) => setAdminEmail(e.target.value)}
+              prefix={<Mail className="w-4 h-4" />}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Password *
+              </label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                prefix={<Lock className="w-4 h-4" />}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Phone Number
+              </label>
+              <Input
+                type="tel"
+                placeholder="017xxxxxxxx"
+                value={adminPhone}
+                onChange={(e) => setAdminPhone(e.target.value)}
+                prefix={<Phone className="w-4 h-4" />}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCreateOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={modalLoading}
+            >
+              {modalLoading ? 'Creating Mess...' : 'Create & Login'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Join Mess with Code */}
+      <Modal
+        isOpen={isJoinOpen}
+        onClose={() => setIsJoinOpen(false)}
+        title="Join Mess with Invite Code"
+      >
+        <form onSubmit={handleJoinMessSubmit} className="space-y-3.5">
+          <p className="text-xs text-slate-500">
+            Enter the 6-character invite code provided by your manager to register and join your mess.
+          </p>
+
+          {modalError && (
+            <div className="p-3 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span>{modalError}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Mess Invite Code *
+            </label>
+            <Input
+              type="text"
+              placeholder="e.g. KHD101"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              prefix={<KeyRound className="w-4 h-4" />}
+              className="font-mono uppercase font-black text-center tracking-widest text-lg"
+              maxLength={10}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Your Full Name *
+            </label>
+            <Input
+              type="text"
+              placeholder="e.g. Sabbir Ahmed"
+              value={memberName}
+              onChange={(e) => setMemberName(e.target.value)}
+              prefix={<User className="w-4 h-4" />}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Email Address *
+            </label>
+            <Input
+              type="email"
+              placeholder="e.g. sabbir@gmail.com"
+              value={memberEmail}
+              onChange={(e) => setMemberEmail(e.target.value)}
+              prefix={<Mail className="w-4 h-4" />}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Password *
+              </label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={memberPassword}
+                onChange={(e) => setMemberPassword(e.target.value)}
+                prefix={<Lock className="w-4 h-4" />}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Phone Number
+              </label>
+              <Input
+                type="tel"
+                placeholder="017xxxxxxxx"
+                value={memberPhone}
+                onChange={(e) => setMemberPhone(e.target.value)}
+                prefix={<Phone className="w-4 h-4" />}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsJoinOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={modalLoading}
+            >
+              {modalLoading ? 'Joining Mess...' : 'Join & Login'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

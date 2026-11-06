@@ -7,8 +7,8 @@ import { useMonthContext } from '../context/MonthContext';
 import { calculateMonthlySummary } from '../utils/calculations';
 
 export const useMonthlySummary = (customMonthId = null) => {
-  const { selectedMonth, currentMonthData, isClosed } = useMonthContext();
-  const activeMonthId = customMonthId || selectedMonth;
+  const { selectedMonth, monthDocId, currentMonthData, isClosed } = useMonthContext();
+  const activeMonthId = customMonthId || monthDocId || selectedMonth;
 
   const { members, loading: membersLoading } = useMembers();
   const { mealRecords, loading: mealsLoading, dailyTotals } = useMeals(activeMonthId);

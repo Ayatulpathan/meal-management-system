@@ -37,8 +37,10 @@ export const getTodayDayNumber = () => {
  * @returns {string}
  */
 export const formatMonthName = (monthId) => {
-  if (!monthId || !monthId.includes('-')) return '';
-  const [year, month] = monthId.split('-').map(Number);
+  if (!monthId) return '';
+  const cleanId = monthId.includes('_') ? monthId.split('_').pop() : monthId;
+  if (!cleanId || !cleanId.includes('-')) return monthId;
+  const [year, month] = cleanId.split('-').map(Number);
   const date = new Date(year, month - 1, 1);
   return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 };

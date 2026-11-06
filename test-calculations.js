@@ -12,7 +12,20 @@ import {
 import { validateMealValue, validateMarketCost, validateDeposit, validateMember } from './src/utils/validation.js';
 import { formatCurrency, formatBalance, parseAmount } from './src/utils/currencyUtils.js';
 import { formatDateDisplay, formatTimeDisplay, getDaysInMonth, getDayList } from './src/utils/dateUtils.js';
-import { createBazarScheduleModel, sanitizeBazarSchedule, BAZAR_DUTY_STATUS } from './src/models/bazarScheduleModel.js';
+import {
+  createBazarScheduleModel,
+  sanitizeBazarSchedule,
+  BAZAR_DUTY_STATUS
+} from './src/models/bazarScheduleModel.js';
+import {
+  DEFAULT_MESS_ID,
+  DEFAULT_MESS_NAME,
+  DEFAULT_INVITE_CODE,
+  createMessModel,
+  getDefaultMess,
+  sanitizeMess,
+  generateInviteCode
+} from './src/models/messModel.js';
 import { sanitizeBDPhoneNumber, generateWhatsAppMessage, getWhatsAppUrl } from './src/utils/bazarNotificationUtils.js';
 
 console.log('====================================================');
@@ -382,6 +395,41 @@ const waUrl = getWhatsAppUrl({
 
 assert(waUrl.startsWith('https://wa.me/8801712345678?text='), 'WhatsApp URL starts with https://wa.me/8801712345678?text=');
 assert(waUrl.includes(encodeURIComponent('Tanvir Rahman')), 'WhatsApp URL encodes member name properly');
+
+// -------------------------------------------------------------------
+// SUITE 5: Multi-Tenant Architecture & Mess Scoping
+// -------------------------------------------------------------------
+const defMess = getDefaultMess();
+assert(defMess.id === 'khadok-mess', 'Default mess ID is khadok-mess');
+assert(defMess.name === 'Khadok Mess', 'Default mess name is Khadok Mess');
+assert(defMess.inviteCode === 'KHD101', 'Default mess invite code is KHD101');
+assert(defMess.isDefault === true, 'Default mess has isDefault flag');
+
+const newMess = createMessModel({
+  name: 'Dhanmondi Flat 4B',
+  managerEmail: 'tanvir@gmail.com',
+  managerName: 'Tanvir Rahman',
+  address: 'Road 7, Dhanmondi',
+});
+assert(newMess.id.startsWith('mess_'), 'Generated mess ID starts with mess_');
+assert(newMess.name === 'Dhanmondi Flat 4B', 'Mess model sets custom mess name');
+assert(newMess.managerEmail === 'tanvir@gmail.com', 'Mess model sets manager email');
+assert(newMess.currency === '৳', 'Mess model defaults currency to ৳');
+assert(newMess.inviteCode.length >= 6, 'Generated invite code is at least 6 characters');
+
+const sanitized = sanitizeMess('custom_mess_99', {
+  name: 'Mirpur Mess',
+  inviteCode: 'mir123',
+});
+assert(sanitized.id === 'custom_mess_99', 'Sanitizer preserves custom mess ID');
+assert(sanitized.name === 'Mirpur Mess', 'Sanitizer preserves mess name');
+assert(sanitized.inviteCode === 'MIR123', 'Sanitizer capitalizes invite code');
+assert(sanitized.isDefault === false, 'Custom mess has isDefault false');
+
+// Multi-tenant Month Name Formatting
+import { formatMonthName } from './src/utils/dateUtils.js';
+assert(formatMonthName('2026-11') === 'November 2026', 'formatMonthName parses legacy 2026-11');
+assert(formatMonthName('custom_mess_99_2026-11') === 'November 2026', 'formatMonthName parses scoped custom_mess_99_2026-11');
 
 console.log('====================================================');
 console.log(`AUDIT RESULTS: ALL ${passedTests}/${totalTests} TESTS PASSED WITH 100% SUCCESS!`);

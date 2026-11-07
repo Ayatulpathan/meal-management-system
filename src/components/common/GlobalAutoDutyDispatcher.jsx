@@ -17,7 +17,8 @@ export const GlobalAutoDutyDispatcher = () => {
   const { user } = useAuthContext();
   const isCheckingRef = useRef(false);
 
-  const activeMonthId = monthDocId || selectedMonth || currentMonthData?.month || getCurrentMonthId();
+  const rawMonthId = monthDocId || selectedMonth || currentMonthData?.month || getCurrentMonthId();
+  const activeMonthId = rawMonthId.includes('_') ? rawMonthId.split('_').pop() : rawMonthId;
 
   useEffect(() => {
     if (!user || !activeMonthId) return;
@@ -35,8 +36,13 @@ export const GlobalAutoDutyDispatcher = () => {
             activeMonthId,
             currentMessId
           );
-          if (emailRes.dispatched > 0) {
+          if (emailRes && emailRes.dispatched > 0) {
             console.log(`[GlobalAutoDutyDispatcher] Auto-dispatched ${emailRes.dispatched} duty email alert(s).`);
+            window.dispatchEvent(
+              new CustomEvent('mms_duty_autodispatched', {
+                detail: { count: emailRes.dispatched, type: 'email', results: emailRes.results },
+              })
+            );
           }
         }
 
@@ -47,8 +53,13 @@ export const GlobalAutoDutyDispatcher = () => {
             [],
             activeMonthId
           );
-          if (waRes.dispatched > 0) {
+          if (waRes && waRes.dispatched > 0) {
             console.log(`[GlobalAutoDutyDispatcher] Auto-dispatched ${waRes.dispatched} WhatsApp alert(s).`);
+            window.dispatchEvent(
+              new CustomEvent('mms_duty_autodispatched', {
+                detail: { count: waRes.dispatched, type: 'whatsapp', results: waRes.results },
+              })
+            );
           }
         }
       } catch (err) {
@@ -58,11 +69,11 @@ export const GlobalAutoDutyDispatcher = () => {
       }
     };
 
-    // Run on mount
+    // Run immediately on mount or config change
     runCheck();
 
-    // Check every 25 seconds
-    const interval = setInterval(runCheck, 25000);
+    // Check every 15 seconds
+    const interval = setInterval(runCheck, 15000);
 
     return () => clearInterval(interval);
   }, [user, currentMessId, activeMonthId]);

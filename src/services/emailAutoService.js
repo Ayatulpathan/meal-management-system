@@ -614,16 +614,21 @@ export const emailAutoService = {
    * @param {Array} schedules
    * @param {string} activeMonthId
    * @param {string} messId
+   * @param {boolean} forceDispatch - When true, bypasses time check and sends immediately
    */
-  async checkAndAutoDispatchToday(schedules = [], activeMonthId, messId = DEFAULT_MESS_ID) {
+  async checkAndAutoDispatchToday(schedules = [], activeMonthId, messId = DEFAULT_MESS_ID, forceDispatch = false) {
     const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
     const config = await this.getConfig(targetMessId);
-    if (!config.enabled) {
+    if (!config.enabled && !forceDispatch) {
       return { dispatched: 0, skipped: true, reason: 'Email automation is disabled in Settings' };
     }
 
+    const cleanMonth = (activeMonthId || getCurrentMonthId()).includes('_')
+      ? (activeMonthId || getCurrentMonthId()).split('_').pop()
+      : (activeMonthId || getCurrentMonthId());
+
     // Check if the current time has reached the scheduled notification time
-    if (config.notifyTime) {
+    if (!forceDispatch && config.notifyTime) {
       const now = new Date();
       const currentHours = String(now.getHours()).padStart(2, '0');
       const currentMins = String(now.getMinutes()).padStart(2, '0');
@@ -643,10 +648,17 @@ export const emailAutoService = {
     if (!dutyList || dutyList.length === 0) {
       try {
         if (isFirebaseConfigured()) {
-          const schedSnap = await getDocs(getMessCollection(targetMessId, 'months', activeMonthId, 'bazarSchedules'));
+          const schedSnap = await getDocs(getMessCollection(targetMessId, 'months', cleanMonth, 'bazarSchedules'));
           dutyList = schedSnap.docs.map((d) => sanitizeBazarSchedule(d.id, d.data()));
+
+          if (dutyList.length === 0 && targetMessId === DEFAULT_MESS_ID) {
+            const rootSnap = await getDocs(getRootCollection('months', cleanMonth, 'bazarSchedules'));
+            dutyList = rootSnap.docs.map((d) => sanitizeBazarSchedule(d.id, d.data()));
+          }
         }
-      } catch (_) {}
+      } catch (err) {
+        console.warn('Could not fetch duty schedules:', err);
+      }
     }
 
     // 2. Fetch members map to resolve member emails if missing in schedule
@@ -673,8 +685,16 @@ export const emailAutoService = {
       }
     }
 
-    // Filter today's duties that haven't received an automated email yet
-    const pendingDuties = (dutyList || []).filter((s) => s.date === todayStr && !s.autoEmailSent);
+    // Filter today's duties that haven't received an automated email yet for TODAY
+    const isAlreadySentForToday = (duty) => {
+      if (forceDispatch) return false;
+      if (!duty.autoEmailSent) return false;
+      if (!duty.autoEmailSentAt) return false;
+      const sentDateStr = duty.autoEmailSentAt.split('T')[0];
+      return sentDateStr === todayStr && duty.emailStatus === 'sent';
+    };
+
+    const pendingDuties = (dutyList || []).filter((s) => s.date === todayStr && !isAlreadySentForToday(s));
 
     if (pendingDuties.length === 0) {
       return { dispatched: 0, message: 'No pending email duties for today.' };
@@ -728,7 +748,7 @@ export const emailAutoService = {
 
       if (res.success && isFirebaseConfigured()) {
         try {
-          await updateMessDocData(targetMessId, ['months', activeMonthId, 'bazarSchedules', duty.id], {
+          await updateMessDocData(targetMessId, ['months', cleanMonth, 'bazarSchedules', duty.id], {
             memberEmail: recipientEmail,
             autoEmailSent: true,
             autoEmailSentAt: new Date().toISOString(),
@@ -751,5 +771,29 @@ export const emailAutoService = {
 
     const successfulCount = results.filter((r) => r.success).length;
     return { dispatched: successfulCount, results };
+  },
+
+  /**
+   * Reset notification status for a specific duty entry so it can be re-dispatched
+   */
+  async resetDutyEmailStatus(scheduleId, activeMonthId, messId = DEFAULT_MESS_ID) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
+    const cleanMonth = (activeMonthId || getCurrentMonthId()).includes('_')
+      ? (activeMonthId || getCurrentMonthId()).split('_').pop()
+      : (activeMonthId || getCurrentMonthId());
+
+    try {
+      if (isFirebaseConfigured()) {
+        await updateMessDocData(targetMessId, ['months', cleanMonth, 'bazarSchedules', scheduleId], {
+          autoEmailSent: false,
+          emailStatus: 'none',
+          autoEmailSentAt: null,
+        });
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('Error resetting duty email status:', err);
+      return { success: false, error: err.message };
+    }
   },
 };

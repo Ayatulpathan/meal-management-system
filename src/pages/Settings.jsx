@@ -20,7 +20,8 @@ import {
   Sparkles,
   Building2,
   Copy,
-  CheckCheck
+  CheckCheck,
+  Play
 } from 'lucide-react';
 import { useMonthContext } from '../context/MonthContext';
 import { useAuthContext } from '../context/AuthContext';
@@ -34,6 +35,7 @@ import { messService } from '../services/messService';
 import { isFirebaseConfigured } from '../services/firebase';
 import { whatsappAutoService, WHATSAPP_PROVIDERS } from '../services/whatsappAutoService';
 import { emailAutoService, EMAIL_PROVIDERS } from '../services/emailAutoService';
+import { getCurrentMonthId } from '../utils/dateUtils';
 
 export const Settings = () => {
   const { currentMonthData, isClosed, toggleMonthStatus } = useMonthContext();
@@ -249,6 +251,38 @@ export const Settings = () => {
       setTestEmailResult({ success: false, message: err.message });
     } finally {
       setIsSendingTestEmail(false);
+    }
+  };
+
+  const [isTriggeringAutoDispatch, setIsTriggeringAutoDispatch] = useState(false);
+  const [autoDispatchResult, setAutoDispatchResult] = useState(null);
+
+  const handleTriggerDailyDispatchNow = async () => {
+    setIsTriggeringAutoDispatch(true);
+    setAutoDispatchResult(null);
+    try {
+      const activeMonth = currentMonthData?.month || getCurrentMonthId();
+      const res = await emailAutoService.checkAndAutoDispatchToday(
+        [],
+        activeMonth,
+        currentMessId,
+        true // forceDispatch = true (bypasses time check and sends immediately for testing)
+      );
+      if (res && res.dispatched > 0) {
+        setAutoDispatchResult({
+          success: true,
+          message: `✓ Daily automated duty notice successfully dispatched to ${res.dispatched} member(s)! Check inbox or spam folder.`,
+        });
+      } else {
+        setAutoDispatchResult({
+          success: false,
+          message: res?.message || res?.reason || 'No pending duty found for today. Make sure a member is assigned for today in Bazar Schedule.',
+        });
+      }
+    } catch (err) {
+      setAutoDispatchResult({ success: false, message: `Dispatch error: ${err.message}` });
+    } finally {
+      setIsTriggeringAutoDispatch(false);
     }
   };
 
@@ -842,13 +876,54 @@ export const Settings = () => {
           )}
 
           {/* Timing Section with TimePicker */}
-          <div className="pt-2 border-t border-slate-100">
+          <div className="pt-2 border-t border-slate-100 space-y-3">
             <TimePicker
               value={emailConfig.notifyTime || '07:00'}
               onChange={(newTime) => setEmailConfig({ ...emailConfig, notifyTime: newTime })}
               label="Daily Automatic Email Dispatch Time (স্বয়ংক্রিয় ইমেইল পাঠানোর সময়):"
               description="Select any hour and minute of the day. Duty notices will be dispatched at this chosen time."
             />
+
+            {/* Quick Live Trigger for Instant Testing */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  Instant Live Test: Dispatch Today's Scheduled Duty (আজকের বাজার নোটিশ এখনই পাঠান)
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Runs the full daily duty email automation right now to today's assigned member so you don't have to wait for the clock to hit the exact minute.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                icon={Play}
+                loading={isTriggeringAutoDispatch}
+                onClick={handleTriggerDailyDispatchNow}
+                className="shrink-0 text-xs font-semibold"
+              >
+                Dispatch Today's Duty Now →
+              </Button>
+            </div>
+
+            {autoDispatchResult && (
+              <div
+                className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  autoDispatchResult.success
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border border-rose-200 text-rose-700'
+                }`}
+              >
+                {autoDispatchResult.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{autoDispatchResult.message}</span>
+              </div>
+            )}
           </div>
 
           {/* Save Button */}

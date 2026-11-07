@@ -241,8 +241,9 @@ async function processMessDuties(db, messId, messName, todayDateStr, monthId, cu
   let sentCount = 0;
 
   for (const duty of todayDuties) {
-    if (duty.autoEmailSent) {
-      console.log(`✓ [Already Sent] Member ${duty.memberName} was already emailed at ${duty.autoEmailSentAt}.`);
+    const isSentForToday = duty.autoEmailSent && duty.autoEmailSentAt && duty.autoEmailSentAt.startsWith(todayDateStr);
+    if (isSentForToday) {
+      console.log(`✓ [Already Sent] Member ${duty.memberName} was already emailed today at ${duty.autoEmailSentAt}.`);
       continue;
     }
 

@@ -40,6 +40,7 @@ export const BazarScheduleModal = ({
         notes: initialData.notes || '',
         estimatedBudget: initialData.estimatedBudget ? String(initialData.estimatedBudget) : '',
         autoNotify: false,
+        resetNotification: false,
       });
     } else {
       const defaultMember = activeMembers[0];
@@ -52,6 +53,7 @@ export const BazarScheduleModal = ({
         notes: '',
         estimatedBudget: '',
         autoNotify: true,
+        resetNotification: false,
       });
     }
     setErrors({});
@@ -91,6 +93,11 @@ export const BazarScheduleModal = ({
     }
 
     const member = activeMembers.find((m) => m.id === formData.memberId);
+    const isDateOrMemberChanged = initialData && (
+      initialData.date !== formData.date ||
+      initialData.memberId !== formData.memberId
+    );
+
     const schedulePayload = {
       ...formData,
       memberName: member ? member.name : formData.memberName,
@@ -99,6 +106,16 @@ export const BazarScheduleModal = ({
       estimatedBudget: Number(formData.estimatedBudget) || 0,
       assignedBy: currentUser?.displayName || 'Administrator',
     };
+
+    // If duty date or member changed, or reset requested, clear previous notification state
+    if (isDateOrMemberChanged || formData.resetNotification) {
+      schedulePayload.autoEmailSent = false;
+      schedulePayload.emailStatus = 'none';
+      schedulePayload.autoEmailSentAt = null;
+      schedulePayload.autoNotified = false;
+      schedulePayload.notificationStatus = 'none';
+      schedulePayload.autoNotifiedAt = null;
+    }
 
     const res = await onSubmit(schedulePayload);
     if (res?.success) {
@@ -190,6 +207,25 @@ export const BazarScheduleModal = ({
             prefix={<FileText className="w-4 h-4 text-slate-400" />}
           />
         </div>
+
+        {isEditing && (
+          <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-blue-900 text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Reset alert status (re-dispatch auto email and WhatsApp for this duty)?</span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                name="resetNotification"
+                checked={formData.resetNotification}
+                onChange={handleChange}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+        )}
 
         {!isEditing && (
           <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 text-xs flex items-center justify-between gap-3">

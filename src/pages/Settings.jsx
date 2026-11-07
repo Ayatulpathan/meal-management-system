@@ -21,7 +21,10 @@ import {
   Building2,
   Copy,
   CheckCheck,
-  Play
+  Play,
+  Calendar,
+  Clock,
+  RotateCcw
 } from 'lucide-react';
 import { useMonthContext } from '../context/MonthContext';
 import { useAuthContext } from '../context/AuthContext';
@@ -35,7 +38,8 @@ import { messService } from '../services/messService';
 import { isFirebaseConfigured } from '../services/firebase';
 import { whatsappAutoService, WHATSAPP_PROVIDERS } from '../services/whatsappAutoService';
 import { emailAutoService, EMAIL_PROVIDERS } from '../services/emailAutoService';
-import { getCurrentMonthId } from '../utils/dateUtils';
+import { bazarScheduleService } from '../services/bazarScheduleService';
+import { getCurrentMonthId, getTodayDateString, formatDateDisplay } from '../utils/dateUtils';
 
 export const Settings = () => {
   const { currentMonthData, isClosed, toggleMonthStatus } = useMonthContext();
@@ -252,6 +256,42 @@ export const Settings = () => {
       setTestEmailResult({ success: false, message: err.message });
     } finally {
       setIsSendingTestEmail(false);
+    }
+  };
+
+  const [todayDuties, setTodayDuties] = useState([]);
+  const [isResettingToday, setIsResettingToday] = useState(false);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState('');
+  const todayStr = getTodayDateString();
+
+  useEffect(() => {
+    const activeMonth = currentMonthData?.month || getCurrentMonthId();
+    const unsubscribe = bazarScheduleService.subscribeBazarSchedule(
+      activeMonth,
+      (schedules) => {
+        const todayItems = (schedules || []).filter((s) => s.date === todayStr);
+        setTodayDuties(todayItems);
+      },
+      currentMessId
+    );
+    return () => unsubscribe();
+  }, [currentMessId, currentMonthData, todayStr]);
+
+  const handleResetTodayForTesting = async () => {
+    setIsResettingToday(true);
+    setResetSuccessMessage('');
+    try {
+      const activeMonth = currentMonthData?.month || getCurrentMonthId();
+      for (const duty of todayDuties) {
+        await emailAutoService.resetDutyEmailStatus(duty.id, activeMonth, currentMessId);
+      }
+      emailAutoService.clearDispatchedCache();
+      setResetSuccessMessage('✓ Successfully reset today\'s duties to Pending. You can now test your new time!');
+      setTimeout(() => setResetSuccessMessage(''), 5000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsResettingToday(false);
     }
   };
 
@@ -878,6 +918,91 @@ export const Settings = () => {
 
           {/* Timing Section with TimePicker */}
           <div className="pt-2 border-t border-slate-100 space-y-3">
+            {/* Today's Live Bazar Duty Status Card */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold text-slate-800">
+                    Today's Bazar Duty Roster & Dispatch Status (আজকের বাজার দায়িত্ব ও স্ট্যাটাস)
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-semibold">
+                  Date: {formatDateDisplay(todayStr)}
+                </span>
+              </div>
+
+              {todayDuties.length === 0 ? (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    No member is scheduled for market duty today. To test, assign a member in <strong>Bazar Schedule</strong> first.
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {todayDuties.map((duty) => (
+                    <div
+                      key={duty.id}
+                      className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
+                          {duty.memberName?.[0]?.toUpperCase() || 'M'}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900">{duty.memberName}</span>
+                            <span className="text-[11px] text-slate-500">({duty.memberEmail || 'No Email'})</span>
+                          </div>
+                          {duty.estimatedBudget > 0 && (
+                            <span className="text-[11px] text-slate-500">Budget: ৳{duty.estimatedBudget}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {duty.autoEmailSent ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                            Already Emailed Today {duty.autoEmailSentAt ? `(${new Date(duty.autoEmailSentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 animate-pulse">
+                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                            Pending (Will send automatically at {emailConfig.notifyTime || '07:00'})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <p className="text-[11px] text-slate-500">
+                      💡 The system dispatches automatically once per day per member to protect against duplicate spam.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      icon={RotateCcw}
+                      loading={isResettingToday}
+                      onClick={handleResetTodayForTesting}
+                      className="text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:border-emerald-300 shrink-0"
+                    >
+                      Reset Today to Pending (টেস্টের জন্য আবার পেন্ডিং করুন)
+                    </Button>
+                  </div>
+
+                  {resetSuccessMessage && (
+                    <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{resetSuccessMessage}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <TimePicker
               value={emailConfig.notifyTime || '07:00'}
               onChange={(newTime) => setEmailConfig({ ...emailConfig, notifyTime: newTime })}

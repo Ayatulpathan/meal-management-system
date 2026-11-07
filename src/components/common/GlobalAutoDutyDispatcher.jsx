@@ -4,7 +4,7 @@ import { useMonthContext } from '../../context/MonthContext';
 import { useAuthContext } from '../../context/AuthContext';
 import { emailAutoService } from '../../services/emailAutoService';
 import { whatsappAutoService } from '../../services/whatsappAutoService';
-import { getCurrentMonthId } from '../../utils/dateUtils';
+import { getCurrentMonthId, getTodayDateString } from '../../utils/dateUtils';
 
 /**
  * Global Background Duty Dispatcher
@@ -16,6 +16,7 @@ export const GlobalAutoDutyDispatcher = () => {
   const { monthDocId, selectedMonth, currentMonthData } = useMonthContext();
   const { user } = useAuthContext();
   const isCheckingRef = useRef(false);
+  const sentTodayRef = useRef(new Set());
 
   const rawMonthId = monthDocId || selectedMonth || currentMonthData?.month || getCurrentMonthId();
   const activeMonthId = rawMonthId.includes('_') ? rawMonthId.split('_').pop() : rawMonthId;
@@ -27,16 +28,19 @@ export const GlobalAutoDutyDispatcher = () => {
       if (isCheckingRef.current) return;
       isCheckingRef.current = true;
 
+      const todayStr = getTodayDateString();
+
       try {
         // 1. Email check & auto-dispatch
         const emailCfg = await emailAutoService.getConfig(currentMessId);
-        if (emailCfg && emailCfg.enabled) {
+        if (emailCfg && emailCfg.enabled && !sentTodayRef.current.has(`${currentMessId}_email_${todayStr}`)) {
           const emailRes = await emailAutoService.checkAndAutoDispatchToday(
             [],
             activeMonthId,
             currentMessId
           );
           if (emailRes && emailRes.dispatched > 0) {
+            sentTodayRef.current.add(`${currentMessId}_email_${todayStr}`);
             console.log(`[GlobalAutoDutyDispatcher] Auto-dispatched ${emailRes.dispatched} duty email alert(s).`);
             window.dispatchEvent(
               new CustomEvent('mms_duty_autodispatched', {
@@ -48,12 +52,13 @@ export const GlobalAutoDutyDispatcher = () => {
 
         // 2. WhatsApp check & auto-dispatch
         const waCfg = await whatsappAutoService.getConfig(currentMessId);
-        if (waCfg && waCfg.enabled) {
+        if (waCfg && waCfg.enabled && !sentTodayRef.current.has(`${currentMessId}_wa_${todayStr}`)) {
           const waRes = await whatsappAutoService.checkAndAutoDispatchToday(
             [],
             activeMonthId
           );
           if (waRes && waRes.dispatched > 0) {
+            sentTodayRef.current.add(`${currentMessId}_wa_${todayStr}`);
             console.log(`[GlobalAutoDutyDispatcher] Auto-dispatched ${waRes.dispatched} WhatsApp alert(s).`);
             window.dispatchEvent(
               new CustomEvent('mms_duty_autodispatched', {
@@ -72,8 +77,8 @@ export const GlobalAutoDutyDispatcher = () => {
     // Run immediately on mount or config change
     runCheck();
 
-    // Check every 15 seconds
-    const interval = setInterval(runCheck, 15000);
+    // Check every 30 seconds
+    const interval = setInterval(runCheck, 30000);
 
     return () => clearInterval(interval);
   }, [user, currentMessId, activeMonthId]);

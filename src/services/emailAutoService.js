@@ -26,6 +26,7 @@ import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 import { sanitizeBazarSchedule } from '../models/bazarScheduleModel';
 
 const CONFIG_STORAGE_KEY = 'mms_email_config';
+const DISPATCHED_MEMORY_CACHE = new Set();
 
 export const EMAIL_PROVIDERS = {
   EMAILJS: 'emailjs',
@@ -688,10 +689,16 @@ export const emailAutoService = {
     // Filter today's duties that haven't received an automated email yet for TODAY
     const isAlreadySentForToday = (duty) => {
       if (forceDispatch) return false;
-      if (!duty.autoEmailSent) return false;
-      if (!duty.autoEmailSentAt) return false;
-      const sentDateStr = duty.autoEmailSentAt.split('T')[0];
-      return sentDateStr === todayStr && duty.emailStatus === 'sent';
+      const cacheKey = `${duty.id}_${todayStr}`;
+      // 1. Check in-memory session cache
+      if (DISPATCHED_MEMORY_CACHE.has(cacheKey)) return true;
+      // 2. Check localStorage persistent cache
+      try {
+        if (localStorage.getItem(`mms_dispatched_${duty.id}`) === todayStr) return true;
+      } catch (_) {}
+      // 3. Check Firestore document autoEmailSent flag
+      if (duty.autoEmailSent) return true;
+      return false;
     };
 
     const pendingDuties = (dutyList || []).filter((s) => s.date === todayStr && !isAlreadySentForToday(s));
@@ -715,6 +722,12 @@ export const emailAutoService = {
         console.warn(`[Auto-Email] Skipping member ${duty.memberName}: no valid email address found.`);
         continue;
       }
+
+      // Mark in cache immediately before sending to prevent race conditions
+      DISPATCHED_MEMORY_CACHE.add(`${duty.id}_${todayStr}`);
+      try {
+        localStorage.setItem(`mms_dispatched_${duty.id}`, todayStr);
+      } catch (_) {}
 
       const emailHtml = generateDutyEmailHtml({
         memberName: duty.memberName || 'সহযোদ্ধা',
@@ -752,8 +765,10 @@ export const emailAutoService = {
             memberEmail: recipientEmail,
             autoEmailSent: true,
             autoEmailSentAt: new Date().toISOString(),
+            lastEmailSentDate: todayStr,
             emailStatus: 'sent',
           });
+          duty.autoEmailSent = true;
           console.log(`✓ [Auto-Email] Successfully updated schedule ${duty.id} as sent!`);
         } catch (dbErr) {
           console.warn('Failed to update duty email status:', dbErr);
@@ -777,6 +792,12 @@ export const emailAutoService = {
    * Reset notification status for a specific duty entry so it can be re-dispatched
    */
   async resetDutyEmailStatus(scheduleId, activeMonthId, messId = DEFAULT_MESS_ID) {
+    const todayStr = getTodayDateString();
+    DISPATCHED_MEMORY_CACHE.delete(`${scheduleId}_${todayStr}`);
+    try {
+      localStorage.removeItem(`mms_dispatched_${scheduleId}`);
+    } catch (_) {}
+
     const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
     const cleanMonth = (activeMonthId || getCurrentMonthId()).includes('_')
       ? (activeMonthId || getCurrentMonthId()).split('_').pop()

@@ -20,7 +20,7 @@ export const createMemberModel = (data = {}) => {
     phone: data.phone?.trim() || '',
     email: data.email?.trim() || '',
     password: data.password || 'member123',
-    role: 'member',
+    role: data.role || 'member',
     status: data.status === 'inactive' ? 'inactive' : 'active',
     joinedAt: data.joinedAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),

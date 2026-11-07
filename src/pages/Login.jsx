@@ -112,6 +112,9 @@ export const Login = () => {
         messId: createdMess.id,
       }, createdMess.id);
 
+      // Explicitly set active mess to the newly created mess before logging in
+      localStorage.setItem('mms_active_mess_id', createdMess.id);
+
       // 3. Immediately log in
       const res = await login(adminEmail.trim(), adminPassword.trim());
       if (res.success) {

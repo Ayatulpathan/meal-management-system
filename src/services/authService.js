@@ -1,18 +1,19 @@
 import { 
   auth, 
-  db,
-  doc,
-  setDoc,
-  getDoc,
+  db, 
+  doc, 
+  setDoc, 
+  getDoc, 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  updateProfile,
+  createUserWithEmailAndPassword, 
+  updateProfile, 
   signOut, 
-  onAuthStateChanged,
-  isFirebaseConfigured
+  onAuthStateChanged, 
+  isFirebaseConfigured 
 } from './firebase';
 import { getLocalMembers, memberService } from './memberService';
-import { DEFAULT_MESS_ID } from '../models/messModel';
+import { messService } from './messService';
+import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
 const USER_STORAGE_KEY = 'mms_active_user';
 
@@ -28,7 +29,7 @@ export const authService = {
       return { user: null, error: 'Email and password are required.' };
     }
 
-    // Check if logging in as Default Administrator
+    // Check if logging in as Default Super Administrator
     if (cleanEmail === 'admin@messhishab.com' || cleanEmail === 'admin@mealmanager.com') {
       if (cleanPassword === 'admin123' || !isFirebaseConfigured()) {
         const adminUser = {
@@ -44,18 +45,35 @@ export const authService = {
       }
     }
 
-    // Resolve user's mess association from users directory or default to Khadok Mess
-    let userMessId = DEFAULT_MESS_ID;
+    // Resolve user's mess association from users directory or local active mess
+    let userMessId = localStorage.getItem('mms_active_mess_id') || DEFAULT_MESS_ID;
+    let registeredRole = null;
+    let registeredName = null;
+
     if (isFirebaseConfigured()) {
       try {
         const userDocRef = doc(db, 'users', cleanEmail);
         const userSnap = await getDoc(userDocRef);
         if (userSnap.exists()) {
-          userMessId = userSnap.data()?.messId || DEFAULT_MESS_ID;
+          const uData = userSnap.data();
+          if (uData?.messId) userMessId = uData.messId;
+          registeredRole = uData?.role || null;
+          registeredName = uData?.name || null;
         }
       } catch (uErr) {
         console.warn('Users mapping lookup notice:', uErr.message);
       }
+    }
+
+    // Check if user is the designated creator / manager of this mess
+    let isMessManager = false;
+    try {
+      const messData = await messService.getMessById(userMessId);
+      if (messData?.managerEmail && messData.managerEmail.toLowerCase() === cleanEmail) {
+        isMessManager = true;
+      }
+    } catch (mErr) {
+      console.warn('Mess lookup notice:', mErr.message);
     }
 
     // Check members inside user's designated mess
@@ -64,7 +82,7 @@ export const authService = {
       (m) => m.email && m.email.toLowerCase() === cleanEmail
     );
 
-    // If not found and userMessId wasn't default, check Khadok Mess as non-destructive fallback
+    // If not found and userMessId wasn't default, check Khadok Mess as fallback
     if (!matchedMember && userMessId !== DEFAULT_MESS_ID) {
       const defaultMembers = await memberService.getMembers(DEFAULT_MESS_ID);
       const fallbackMatch = defaultMembers.find(
@@ -83,12 +101,22 @@ export const authService = {
 
       const expectedPassword = matchedMember.password || 'member123';
       if (cleanPassword === expectedPassword) {
+        // Enforce admin role if user is the mess manager or designated admin
+        const effectiveRole = (isMessManager || cleanEmail.includes('admin') || registeredRole === 'admin' || matchedMember.role === 'admin')
+          ? 'admin'
+          : 'member';
+
+        // Auto-heal member document in Firestore if role was previously saved as 'member'
+        if (effectiveRole === 'admin' && matchedMember.role !== 'admin') {
+          memberService.updateMember(matchedMember.id, { role: 'admin' }, userMessId).catch(console.warn);
+        }
+
         const user = {
           uid: matchedMember.id,
           memberId: matchedMember.id,
           email: matchedMember.email,
-          displayName: matchedMember.name,
-          role: matchedMember.role || 'member',
+          displayName: matchedMember.name || registeredName || 'User',
+          role: effectiveRole,
           phone: matchedMember.phone,
           messId: userMessId,
         };
@@ -109,20 +137,28 @@ export const authService = {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const fbUser = userCredential.user;
       
-      const allMembers = await memberService.getMembers();
-      const existingMember = allMembers.find(m => m.email && m.email.toLowerCase() === cleanEmail);
+      const messMembers = await memberService.getMembers(userMessId);
+      const existingMember = messMembers.find(m => m.email && m.email.toLowerCase() === cleanEmail);
 
-      const role = cleanEmail.includes('admin') ? 'admin' : (existingMember?.role || 'member');
+      const effectiveRole = (isMessManager || cleanEmail.includes('admin') || registeredRole === 'admin' || existingMember?.role === 'admin')
+        ? 'admin'
+        : (existingMember?.role || 'member');
       const memberId = existingMember ? existingMember.id : fbUser.uid;
+
+      if (effectiveRole === 'admin' && existingMember && existingMember.role !== 'admin') {
+        memberService.updateMember(existingMember.id, { role: 'admin' }, userMessId).catch(console.warn);
+      }
 
       const user = {
         uid: fbUser.uid,
         memberId,
         email: fbUser.email,
-        displayName: fbUser.displayName || existingMember?.name || 'User',
-        role,
+        displayName: fbUser.displayName || existingMember?.name || registeredName || 'User',
+        role: effectiveRole,
+        messId: userMessId,
       };
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+      localStorage.setItem('mms_active_mess_id', userMessId);
       return { user, error: null };
     } catch (err) {
       let friendlyMessage = 'Unable to sign in. Please check your credentials.';
@@ -218,25 +254,50 @@ export const authService = {
       return () => window.removeEventListener('storage', checkLocal);
     }
 
-    return onAuthStateChanged(auth, (firebaseUser) => {
+    return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const stored = localStorage.getItem(USER_STORAGE_KEY);
         let role = 'member';
         let memberId = null;
+        let messId = localStorage.getItem('mms_active_mess_id') || DEFAULT_MESS_ID;
+
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
-            role = parsed.role || (firebaseUser.email?.includes('admin') ? 'admin' : 'member');
+            role = parsed.role || role;
             memberId = parsed.memberId || null;
+            messId = parsed.messId || messId;
           } catch (e) {}
         }
-        callback({
+
+        const fbEmail = (firebaseUser.email || '').toLowerCase();
+
+        // Enforce admin role if user is the mess manager or email has admin
+        if (messId) {
+          try {
+            const messData = await messService.getMessById(messId);
+            if (messData?.managerEmail && messData.managerEmail.toLowerCase() === fbEmail) {
+              role = 'admin';
+            }
+          } catch (e) {}
+        }
+        if (fbEmail.includes('admin') || fbEmail === 'admin@messhishab.com') {
+          role = 'admin';
+        }
+
+        const authUser = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName || 'User',
           role,
           memberId,
-        });
+          messId,
+        };
+
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authUser));
+        localStorage.setItem('mms_active_mess_id', messId);
+
+        callback(authUser);
       } else {
         checkLocal();
       }

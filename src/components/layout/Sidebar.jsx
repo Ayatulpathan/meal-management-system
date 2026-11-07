@@ -57,7 +57,15 @@ export const Sidebar = ({ onClose }) => {
     { name: 'Mess Chat', path: '/chat', icon: MessageSquare },
   ];
 
-  const navigationItems = isMember ? memberNavItems : adminNavItems;
+  const isManager = !!(
+    currentMess?.managerEmail &&
+    user?.email &&
+    currentMess.managerEmail.toLowerCase() === user.email.toLowerCase()
+  );
+  const effectiveIsAdmin = isAdmin || isManager || user?.role === 'admin';
+  const effectiveIsMember = !effectiveIsAdmin;
+
+  const navigationItems = effectiveIsMember ? memberNavItems : adminNavItems;
 
   return (
     <aside className="flex flex-col h-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-300 w-64 select-none border-r border-slate-800/80 shadow-2xl">
@@ -71,7 +79,7 @@ export const Sidebar = ({ onClose }) => {
             {currentMess?.name || 'MessHishab'}
           </h1>
           <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5 truncate">
-            <Sparkles className="w-3 h-3 shrink-0" /> {isMember ? 'Member' : 'Admin'} • Code: {currentMess?.inviteCode}
+            <Sparkles className="w-3 h-3 shrink-0" /> {effectiveIsMember ? 'Member' : 'Admin'} • Code: {currentMess?.inviteCode}
           </p>
         </div>
       </div>
@@ -150,12 +158,12 @@ export const Sidebar = ({ onClose }) => {
                 </p>
                 <span
                   className={`text-[8px] px-1.5 py-0.2 rounded font-extrabold uppercase ${
-                    isMember
+                    effectiveIsMember
                       ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                       : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                   }`}
                 >
-                  {isMember ? 'Member' : 'Admin'}
+                  {effectiveIsMember ? 'Member' : 'Admin'}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 truncate">

@@ -263,5 +263,19 @@ export const memberService = {
       console.error('Error deleting member:', err);
       throw new Error('Unable to delete member.');
     }
+  },
+
+  /**
+   * Deactivate member (soft-delete / archive)
+   */
+  async deactivateMember(memberId, messId) {
+    return this.updateMember(memberId, { status: 'inactive' }, messId);
+  },
+
+  /**
+   * Reactivate member
+   */
+  async activateMember(memberId, messId) {
+    return this.updateMember(memberId, { status: 'active' }, messId);
   }
 };

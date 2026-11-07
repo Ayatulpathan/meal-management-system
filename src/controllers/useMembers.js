@@ -61,7 +61,7 @@ export const useMembers = () => {
     setActionLoading(true);
     setError(null);
     try {
-      const updated = await memberService.updateMember(memberId, memberData);
+      const updated = await memberService.updateMember(memberId, memberData, currentMessId);
       return { success: true, member: updated };
     } catch (err) {
       setError(err.message);
@@ -69,7 +69,7 @@ export const useMembers = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [isAdmin, currentMemberId]);
+  }, [isAdmin, currentMemberId, currentMessId]);
 
   const deactivateMember = useCallback(async (memberId) => {
     if (!isAdmin) {
@@ -79,7 +79,7 @@ export const useMembers = () => {
     setActionLoading(true);
     setError(null);
     try {
-      await memberService.deactivateMember(memberId);
+      await memberService.deactivateMember(memberId, currentMessId);
       return { success: true };
     } catch (err) {
       setError(err.message);
@@ -87,7 +87,7 @@ export const useMembers = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin, currentMessId]);
 
   const activateMember = useCallback(async (memberId) => {
     if (!isAdmin) {
@@ -97,7 +97,7 @@ export const useMembers = () => {
     setActionLoading(true);
     setError(null);
     try {
-      await memberService.activateMember(memberId);
+      await memberService.activateMember(memberId, currentMessId);
       return { success: true };
     } catch (err) {
       setError(err.message);
@@ -105,7 +105,7 @@ export const useMembers = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin, currentMessId]);
 
   const activeMembers = members.filter(m => m.status === 'active');
   const inactiveMembers = members.filter(m => m.status === 'inactive');

@@ -275,7 +275,8 @@ export const Settings = () => {
         adminEmail,
         adminPassword,
         'admin',
-        adminPhone
+        adminPhone,
+        currentMessId
       );
 
       if (res.error) {

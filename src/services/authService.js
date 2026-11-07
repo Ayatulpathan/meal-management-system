@@ -138,9 +138,10 @@ export const authService = {
   },
 
   /**
-   * Register a new admin or member
+   * Register a new admin or member in a designated mess
    */
-  async createAccount(name, email, password, role = 'member', phone = '') {
+  async createAccount(name, email, password, role = 'member', phone = '', messId = null) {
+    const targetMessId = messId || getActiveMessId() || DEFAULT_MESS_ID;
     const cleanName = (name || '').trim();
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanPassword = (password || '').trim();
@@ -151,10 +152,10 @@ export const authService = {
       return { user: null, error: 'Password must be at least 6 characters long.' };
     }
 
-    const members = await memberService.getMembers();
+    const members = await memberService.getMembers(targetMessId);
     const existing = members.find(m => m.email && m.email.toLowerCase() === cleanEmail);
     if (existing) {
-      return { user: null, error: 'An account with this email address already exists.' };
+      return { user: null, error: 'An account with this email address already exists in this mess.' };
     }
 
     const newMember = await memberService.createMember({
@@ -164,7 +165,8 @@ export const authService = {
       password: cleanPassword,
       role,
       status: 'active',
-    });
+      messId: targetMessId,
+    }, targetMessId);
 
     if (isFirebaseConfigured()) {
       try {

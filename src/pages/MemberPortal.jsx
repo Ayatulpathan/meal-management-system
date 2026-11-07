@@ -26,8 +26,9 @@ import { SummaryCard } from '../components/common/SummaryCard';
 import { Button } from '../components/common/Button';
 import { Loader } from '../components/common/Loader';
 import { MarketCostForm } from '../components/market/MarketCostForm';
+import { MemberPushNotificationCard } from '../components/notifications/MemberPushNotificationCard';
 import { formatCurrency, formatBalance } from '../utils/currencyUtils';
-import { getDayList, formatDateDisplay, formatTimeDisplay, getTodayDayNumber } from '../utils/dateUtils';
+import { getDayList, formatDateDisplay, formatTimeDisplay, getTodayDayNumber, getTodayDateString } from '../utils/dateUtils';
 
 export const MemberPortal = () => {
   const { user, currentMemberId } = useAuthContext();
@@ -43,7 +44,7 @@ export const MemberPortal = () => {
   const memberId = currentMemberId;
   const daysList = getDayList(selectedMonth);
   const todayDay = getTodayDayNumber();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayDateString();
 
   const myBazarDuties = useMemo(() => {
     return schedules.filter(
@@ -174,6 +175,9 @@ export const MemberPortal = () => {
           </button>
         </div>
       )}
+
+      {/* Member Push Notification Settings Card */}
+      <MemberPushNotificationCard />
 
       {/* Personal Financial Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

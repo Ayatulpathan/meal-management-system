@@ -24,7 +24,12 @@ import {
   Play,
   Calendar,
   Clock,
-  RotateCcw
+  RotateCcw,
+  Bell,
+  BellRing,
+  Smartphone,
+  Laptop,
+  Vibrate
 } from 'lucide-react';
 import { useMonthContext } from '../context/MonthContext';
 import { useAuthContext } from '../context/AuthContext';
@@ -38,6 +43,7 @@ import { messService } from '../services/messService';
 import { isFirebaseConfigured } from '../services/firebase';
 import { whatsappAutoService, WHATSAPP_PROVIDERS } from '../services/whatsappAutoService';
 import { emailAutoService, EMAIL_PROVIDERS } from '../services/emailAutoService';
+import { fcmNotificationService } from '../services/fcmNotificationService';
 import { bazarScheduleService } from '../services/bazarScheduleService';
 import { getCurrentMonthId, getTodayDateString, formatDateDisplay } from '../utils/dateUtils';
 
@@ -115,6 +121,21 @@ export const Settings = () => {
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailResult, setTestEmailResult] = useState(null);
 
+  // Push Notification state
+  const [pushConfig, setPushConfig] = useState({
+    enabled: true,
+    notifyTime: '07:00',
+    timezone: 'Asia/Dhaka',
+    vapidKey: '',
+  });
+  const [isSavingPush, setIsSavingPush] = useState(false);
+  const [pushSaveSuccess, setPushSaveSuccess] = useState('');
+  const [pushSaveError, setPushSaveError] = useState('');
+  const [recentPushLogs, setRecentPushLogs] = useState([]);
+  const [isLoadingPushLogs, setIsLoadingPushLogs] = useState(false);
+  const [testPushResult, setTestPushResult] = useState(null);
+  const [isTestingPush, setIsTestingPush] = useState(false);
+
   const fetchAdmins = async () => {
     try {
       const allMembers = await memberService.getMembers(currentMessId);
@@ -146,11 +167,77 @@ export const Settings = () => {
     }
   };
 
+  const fetchPushConfig = async () => {
+    try {
+      const cfg = await fcmNotificationService.getConfig(currentMessId);
+      setPushConfig(cfg);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchPushLogs = async () => {
+    setIsLoadingPushLogs(true);
+    try {
+      const logs = await fcmNotificationService.getRecentLogs(15);
+      setRecentPushLogs(logs);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoadingPushLogs(false);
+    }
+  };
+
   useEffect(() => {
     fetchAdmins();
     fetchWaConfig();
     fetchEmailConfig();
+    fetchPushConfig();
+    fetchPushLogs();
   }, [currentMessId]);
+
+  const handleSavePushConfig = async (e) => {
+    e.preventDefault();
+    setIsSavingPush(true);
+    setPushSaveSuccess('');
+    setPushSaveError('');
+    try {
+      const res = await fcmNotificationService.saveConfig(currentMessId, pushConfig);
+      if (res.success) {
+        setPushSaveSuccess('Push Notification settings updated and saved successfully!');
+        setTimeout(() => setPushSaveSuccess(''), 4000);
+      } else {
+        setPushSaveError(res.error || 'Failed to save push settings.');
+      }
+    } catch (err) {
+      setPushSaveError(err.message);
+    } finally {
+      setIsSavingPush(false);
+    }
+  };
+
+  const handleTestDevicePush = async () => {
+    setIsTestingPush(true);
+    setTestPushResult(null);
+    try {
+      const res = await fcmNotificationService.sendLocalTestNotification();
+      if (res.success) {
+        setTestPushResult({
+          success: true,
+          message: '✓ Local device notification triggered! Check your notification tray (vibration tested).',
+        });
+      } else {
+        setTestPushResult({
+          success: false,
+          message: res.error || 'Could not show notification. Make sure permissions are granted.',
+        });
+      }
+    } catch (err) {
+      setTestPushResult({ success: false, message: err.message });
+    } finally {
+      setIsTestingPush(false);
+    }
+  };
 
   const handleSaveWaConfig = async (e) => {
     e.preventDefault();
@@ -1127,6 +1214,210 @@ export const Settings = () => {
                   </a>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Push Notification Automation Section */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+              <BellRing className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">
+                  Bazar Duty Push Notification Automation (ওয়েব পুশ নোটিফিকেশন সেটিংস)
+                </h3>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  pushConfig.enabled
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {pushConfig.enabled ? 'Push Active' : 'Push Disabled'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Automatically delivers background push notifications to the assigned member's Android phones and Windows PCs at the set reminder time. 100% Free with zero SMS fees.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {pushSaveSuccess && (
+          <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{pushSaveSuccess}</span>
+          </div>
+        )}
+
+        {pushSaveError && (
+          <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{pushSaveError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSavePushConfig} className="mt-5 space-y-5">
+          {/* Main Enable Toggle */}
+          <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+            <div>
+              <label htmlFor="push-enable-toggle" className="text-xs font-bold text-slate-800 cursor-pointer block">
+                Enable Daily Bazar Duty Push Reminders (স্বয়ংক্রিয় পুশ নোটিফিকেশন চালু রাখুন)
+              </label>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                When enabled, the assigned member receives a vibration reminder on their active device(s) on their duty day.
+              </p>
+            </div>
+            <input
+              id="push-enable-toggle"
+              type="checkbox"
+              checked={pushConfig.enabled}
+              onChange={(e) => setPushConfig({ ...pushConfig, enabled: e.target.checked })}
+              className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-slate-300 cursor-pointer"
+            />
+          </div>
+
+          {/* Time Picker */}
+          <div className="p-4 rounded-xl bg-slate-50/60 border border-slate-200 space-y-2">
+            <TimePicker
+              label="Daily Push Dispatch Time (নোটিফিকেশন পাঠানোর নির্ধারিত সময়):"
+              value={pushConfig.notifyTime || '07:00'}
+              onChange={(newTime) => setPushConfig({ ...pushConfig, notifyTime: newTime })}
+              helperText="Duty push notifications will be automatically triggered at this chosen time (Asia/Dhaka timezone)."
+            />
+          </div>
+
+          {/* Web Push Configuration */}
+          <div className="p-4 rounded-xl bg-slate-50/60 border border-slate-200 space-y-3">
+            <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-indigo-600" />
+              Firebase Web Push VAPID Certificate (ঐচ্ছিক কি সেটিংস)
+            </h4>
+            <p className="text-xs text-slate-500">
+              Web Push requires a public VAPID key. If left blank, the application uses the default environment key. You can also paste your own key generated from Firebase Console &gt; Project Settings &gt; Cloud Messaging.
+            </p>
+            <Input
+              label="Public VAPID Key (Optional)"
+              placeholder="e.g. BEl-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              value={pushConfig.vapidKey || ''}
+              onChange={(e) => setPushConfig({ ...pushConfig, vapidKey: e.target.value })}
+            />
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end pt-2">
+            <Button
+              type="submit"
+              variant="primary"
+              loading={isSavingPush}
+              icon={CheckCircle2}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              Save Push Notification Settings
+            </Button>
+          </div>
+        </form>
+
+        {/* Live Test Notification Box */}
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Send className="w-3.5 h-3.5 text-indigo-600" />
+            Test Device Push &amp; Vibration (টেস্ট পুশ নোটিফিকেশন)
+          </h4>
+          <p className="text-xs text-slate-500 mb-3">
+            Trigger a sample bazar duty push reminder right now on this device to verify the notification tray popup and vibration pattern ([300, 100, 300] ms).
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              loading={isTestingPush}
+              onClick={handleTestDevicePush}
+              icon={Vibrate}
+              className="w-full sm:w-auto"
+            >
+              Trigger Test Push on This Device
+            </Button>
+          </div>
+
+          {testPushResult && (
+            <div
+              className={`mt-3 p-3 rounded-xl text-xs flex items-center gap-2 ${
+                testPushResult.success
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                  : 'bg-rose-50 border border-rose-200 text-rose-700'
+              }`}
+            >
+              {testPushResult.success ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0" />
+              )}
+              <span>{testPushResult.message}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Recent Notification Logs Viewer */}
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-slate-500" />
+              Recent Push Notification Delivery Logs (সর্বশেষ নোটিফিকেশন লগ)
+            </h4>
+            <button
+              type="button"
+              onClick={fetchPushLogs}
+              disabled={isLoadingPushLogs}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold inline-flex items-center gap-1"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isLoadingPushLogs ? 'animate-spin' : ''}`} />
+              <span>Refresh Logs</span>
+            </button>
+          </div>
+
+          {recentPushLogs.length === 0 ? (
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-center text-xs text-slate-500">
+              No push notifications logged yet. When the automated dispatcher triggers for a duty day, records will appear here with delivery timestamps and statuses.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200 text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-semibold">
+                  <tr>
+                    <th className="py-2.5 px-3 text-left">Duty Date</th>
+                    <th className="py-2.5 px-3 text-left">Member UID</th>
+                    <th className="py-2.5 px-3 text-left">Status</th>
+                    <th className="py-2.5 px-3 text-left">Devices</th>
+                    <th className="py-2.5 px-3 text-left">Sent At (BST)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {recentPushLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-2 px-3 font-medium text-slate-800">{log.dutyDate || '—'}</td>
+                      <td className="py-2 px-3 text-slate-600 font-mono text-[11px]">{log.memberUid?.slice(0, 12)}...</td>
+                      <td className="py-2 px-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          log.status === 'sent'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : log.status === 'no_tokens'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {log.status === 'sent' ? '✓ Sent' : log.status === 'no_tokens' ? 'No Tokens' : 'Failed'}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-slate-600">{log.tokenCount || 1} device(s)</td>
+                      <td className="py-2 px-3 text-slate-500">{log.sentAt ? new Date(log.sentAt).toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

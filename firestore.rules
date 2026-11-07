@@ -69,5 +69,15 @@ service cloud.firestore {
     match /chatMessages/{messageId} {
       allow read, write: if true;
     }
+
+    // FCM Device Tokens for Bazar Duty Push Notifications
+    match /deviceTokens/{tokenId} {
+      allow read, write: if true;
+    }
+
+    // Notification Logs (Idempotency and Delivery Auditing)
+    match /notificationLogs/{logId} {
+      allow read, write: if true;
+    }
   }
 }

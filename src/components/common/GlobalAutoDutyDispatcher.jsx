@@ -4,6 +4,7 @@ import { useMonthContext } from '../../context/MonthContext';
 import { useAuthContext } from '../../context/AuthContext';
 import { emailAutoService } from '../../services/emailAutoService';
 import { whatsappAutoService } from '../../services/whatsappAutoService';
+import { fcmNotificationService } from '../../services/fcmNotificationService';
 import { getCurrentMonthId, getTodayDateString } from '../../utils/dateUtils';
 
 /**
@@ -61,6 +62,22 @@ export const GlobalAutoDutyDispatcher = () => {
               })
             );
           }
+        }
+
+        // 3. Web Push Notification check & auto-dispatch
+        const pushRes = await fcmNotificationService.checkAndAutoDispatchToday(
+          [],
+          activeMonthId,
+          currentMessId,
+          user?.memberId || user?.uid
+        );
+        if (pushRes && pushRes.dispatched > 0) {
+          console.log(`[GlobalAutoDutyDispatcher] Auto-dispatched ${pushRes.dispatched} Push alert(s).`);
+          window.dispatchEvent(
+            new CustomEvent('mms_duty_autodispatched', {
+              detail: { count: pushRes.dispatched, type: 'push', results: pushRes.results },
+            })
+          );
         }
       } catch (err) {
         console.warn('[GlobalAutoDutyDispatcher] Background check error:', err);

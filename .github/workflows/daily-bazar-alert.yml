@@ -39,3 +39,10 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: node scripts/cron-email-duty.mjs
+
+      - name: Execute Daily Member Web Push Notification Dispatcher
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY || 'AIzaSyDcvOWmVDpn1VX2FWnmPU1NyqhrhGTviZQ' }}
+          VITE_FIREBASE_PROJECT_ID: 'khadok-meal'
+          FCM_SERVER_KEY: ${{ secrets.FCM_SERVER_KEY }}
+        run: node scripts/cron-push-duty.mjs || true

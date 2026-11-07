@@ -15,6 +15,8 @@ import { getLocalMembers, memberService } from './memberService';
 import { messService } from './messService';
 import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
 
+import { fcmNotificationService } from './fcmNotificationService';
+
 const USER_STORAGE_KEY = 'mms_active_user';
 
 export const authService = {
@@ -222,6 +224,11 @@ export const authService = {
    * Sign out user
    */
   async logout() {
+    try {
+      await fcmNotificationService.unregisterCurrentDevice();
+    } catch (pushErr) {
+      console.warn('Could not unregister device token on logout:', pushErr);
+    }
     localStorage.removeItem(USER_STORAGE_KEY);
     if (isFirebaseConfigured()) {
       try {

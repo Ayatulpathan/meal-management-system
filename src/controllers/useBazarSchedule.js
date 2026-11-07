@@ -9,6 +9,7 @@ import {
   copyToClipboard
 } from '../utils/bazarNotificationUtils';
 import { whatsappAutoService } from '../services/whatsappAutoService';
+import { emailAutoService, generateDutyEmailHtml } from '../services/emailAutoService';
 
 export const useBazarSchedule = (customMonthId = null) => {
   const { selectedMonth, monthDocId, currentMonthData } = useMonthContext();
@@ -164,17 +165,29 @@ export const useBazarSchedule = (customMonthId = null) => {
 
   const [autoDispatchStatus, setAutoDispatchStatus] = useState(null);
 
-  // Auto-check and dispatch today's duty alert if enabled in settings
+  // Auto-check and dispatch today's duty alert (WhatsApp & Email) if enabled in settings
   useEffect(() => {
     let isMounted = true;
     const runAutoDispatch = async () => {
       if (!schedules || schedules.length === 0 || !activeMonthId) return;
       try {
-        const config = await whatsappAutoService.getConfig();
-        if (config.enabled && isMounted) {
+        const waCfg = await whatsappAutoService.getConfig();
+        if (waCfg.enabled && isMounted) {
           const res = await whatsappAutoService.checkAndAutoDispatchToday(schedules, activeMonthId);
           if (res.dispatched > 0 && isMounted) {
             setAutoDispatchStatus(`Auto-sent WhatsApp alert to ${res.dispatched} duty member(s).`);
+          }
+        }
+
+        const emailCfg = await emailAutoService.getConfig();
+        if (emailCfg.enabled && isMounted) {
+          const emailRes = await emailAutoService.checkAndAutoDispatchToday(schedules, activeMonthId);
+          if (emailRes.dispatched > 0 && isMounted) {
+            setAutoDispatchStatus((prev) =>
+              prev
+                ? `${prev} & auto-emailed ${emailRes.dispatched} duty member(s).`
+                : `Auto-emailed ${emailRes.dispatched} duty member(s).`
+            );
           }
         }
       } catch (err) {
@@ -185,6 +198,27 @@ export const useBazarSchedule = (customMonthId = null) => {
     runAutoDispatch();
     return () => { isMounted = false; };
   }, [schedules, activeMonthId]);
+
+  const sendManualEmail = async (schedule) => {
+    setActionLoading(true);
+    try {
+      const emailHtml = generateDutyEmailHtml({
+        memberName: schedule.memberName || 'সহযোদ্ধা',
+        date: schedule.date,
+        estimatedBudget: schedule.estimatedBudget || 0,
+        notes: schedule.notes || '',
+      });
+      const res = await emailAutoService.sendEmail({
+        to: schedule.memberEmail || schedule.email,
+        subject: `🛒 বাজার শিডিউল অ্যালার্ট - ${schedule.date}`,
+        html: emailHtml,
+        memberName: schedule.memberName,
+      });
+      return res;
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const notifyOnWhatsApp = (schedule) => {
     const message = generateWhatsAppMessage({ schedule });
@@ -226,5 +260,6 @@ export const useBazarSchedule = (customMonthId = null) => {
     notifyOnWhatsApp,
     copyWhatsAppMessage,
     sendAutoWhatsApp,
+    sendManualEmail,
   };
 };

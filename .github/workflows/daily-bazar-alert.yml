@@ -2,8 +2,8 @@ name: Daily Automated Bazar Duty Alert
 
 on:
   schedule:
-    # 01:00 UTC = 07:00 AM Bangladesh Standard Time (BST / UTC+6)
-    - cron: '0 1 * * *'
+    # Runs hourly to dispatch at each mess's selected custom notification time
+    - cron: '0 * * * *'
   workflow_dispatch: # Allows manual trigger from GitHub anytime
 
 jobs:

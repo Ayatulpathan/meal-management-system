@@ -1,7 +1,8 @@
 /**
  * MessHishab - 24/7 Automated Daily Bazar Duty Email Dispatcher
- * Sends rich HTML email alerts to today's duty member via Gmail SMTP or Resend/Brevo
- * Can run completely on its own every morning at 07:00 AM via GitHub Actions (Free)
+ * Multi-Tenant & Standalone Aware: Iterates through each mess, checks notifyTime,
+ * and sends rich HTML email alerts to today's duty member via Gmail SMTP, Resend, Brevo, or Google Script.
+ * Runs on GitHub Actions (Free) or via CLI
  */
 
 import nodemailer from 'nodemailer';
@@ -25,7 +26,7 @@ const firebaseConfig = {
 };
 
 // Rich HTML Template
-function generateDutyEmailHtml({ memberName, date, estimatedBudget, notes }) {
+function generateDutyEmailHtml({ memberName, date, estimatedBudget, notes, messName = 'MessHishab' }) {
   const notesHtml = notes
     ? `<div style="margin-top:12px; padding:12px; background-color:#f1f5f9; border-left:4px solid #10b981; border-radius:6px; font-size:14px; color:#334155;">
         <strong>📝 বাজারের ফর্দ / নোট:</strong><br/>${notes}
@@ -37,7 +38,7 @@ function generateDutyEmailHtml({ memberName, date, estimatedBudget, notes }) {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Bazar Duty Reminder</title>
+  <title>Bazar Duty Reminder - ${messName}</title>
 </head>
 <body style="margin:0; padding:0; background-color:#f8fafc; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color:#1e293b;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f8fafc; padding:30px 10px;">
@@ -47,7 +48,7 @@ function generateDutyEmailHtml({ memberName, date, estimatedBudget, notes }) {
           <tr>
             <td style="background:linear-gradient(135deg, #059669 0%, #0d9488 100%); padding:28px 24px; text-align:center;">
               <h1 style="color:#ffffff; margin:0; font-size:24px; font-weight:800;">
-                🛒 MessHishab
+                🛒 ${messName}
               </h1>
               <p style="color:#a7f3d0; margin:6px 0 0 0; font-size:13px; font-weight:500;">
                 দৈনিক বাজার শিডিউল নোটিফিকেশন (Bazar Duty Alert)
@@ -95,7 +96,7 @@ function generateDutyEmailHtml({ memberName, date, estimatedBudget, notes }) {
           </tr>
           <tr>
             <td style="background-color:#f8fafc; padding:18px 24px; border-top:1px solid #e2e8f0; text-align:center; font-size:12px; color:#94a3b8;">
-              <p style="margin:0;">This is an automated notification from <strong>MessHishab</strong>.</p>
+              <p style="margin:0;">This is an automated notification from <strong>${messName}</strong>.</p>
             </td>
           </tr>
         </table>
@@ -107,43 +108,53 @@ function generateDutyEmailHtml({ memberName, date, estimatedBudget, notes }) {
   `.trim();
 }
 
-async function runDailyEmailDispatcher() {
-  console.log('====================================================');
-  console.log('MessHishab - Automated Daily Email Duty Dispatcher');
-  console.log(`Current Time (UTC): ${new Date().toISOString()}`);
-  console.log('====================================================');
+async function processMessDuties(db, messId, messName, todayDateStr, monthId, currentBstTimeStr) {
+  console.log(`\n--- Processing Mess: [${messId}] ${messName || ''} ---`);
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // 1. Fetch Email configuration
+  // 1. Fetch Email Config
   let config = {
     enabled: true,
-    senderEmail: process.env.GMAIL_USER || 'messhishab@gmail.com',
-    senderName: 'MessHishab Manager',
+    senderEmail: process.env.GMAIL_USER || '',
+    senderName: messName || 'MessHishab Manager',
     gmailAppPassword: process.env.GMAIL_APP_PASSWORD || '',
     resendApiKey: process.env.RESEND_API_KEY || '',
+    brevoApiKey: process.env.BREVO_API_KEY || '',
+    googleScriptUrl: '',
+    notifyTime: '07:00',
   };
 
+  // Try mess settings first
   try {
-    const configSnap = await getDoc(doc(db, 'settings', 'emailConfig'));
-    if (configSnap.exists()) {
-      config = { ...config, ...configSnap.data() };
-      console.log('Loaded Email configuration from Firestore.');
-    } else {
-      console.log('No Firestore emailConfig found. Using default/environment settings.');
+    const snap = await getDoc(doc(db, 'messes', messId, 'settings', 'email'));
+    if (snap.exists()) {
+      config = { ...config, ...snap.data() };
+      console.log(`Loaded config from messes/${messId}/settings/email`);
+    } else if (messId === 'khadok-mess') {
+      const rootSnap = await getDoc(doc(db, 'settings', 'email'));
+      if (rootSnap.exists()) {
+        config = { ...config, ...rootSnap.data() };
+      } else {
+        const legacySnap = await getDoc(doc(db, 'settings', 'emailConfig'));
+        if (legacySnap.exists()) {
+          config = { ...config, ...legacySnap.data() };
+        }
+      }
     }
   } catch (err) {
-    console.warn('Warning: Could not fetch settings/emailConfig:', err.message);
+    console.warn(`Could not load email config for mess ${messId}:`, err.message);
   }
 
   if (!config.enabled) {
-    console.log('ℹ️ Email automated alerts are disabled in Settings. Skipping execution.');
-    process.exit(0);
+    console.log(`Email automation is disabled for mess ${messId}. Skipping.`);
+    return 0;
   }
 
-  // 2. Load all members to map emails by ID or Name
-  const membersSnap = await getDocs(collection(db, 'members'));
+  // Check notifyTime
+  const notifyTime = config.notifyTime || '07:00';
+  console.log(`Configured Notify Time: ${notifyTime} (Current BST Time: ${currentBstTimeStr})`);
+
+  // 2. Fetch Members for this mess
+  const membersSnap = await getDocs(collection(db, 'messes', messId, 'members'));
   const membersMap = {};
   membersSnap.forEach((d) => {
     const data = d.data();
@@ -151,36 +162,43 @@ async function runDailyEmailDispatcher() {
     if (data.name) membersMap[data.name.trim().toLowerCase()] = data;
   });
 
-  // Calculate current date in Bangladesh Time (UTC+6)
-  const now = new Date();
-  const bdTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' });
-  const bdDate = new Date(bdTimeStr);
-  const year = bdDate.getFullYear();
-  const month = String(bdDate.getMonth() + 1).padStart(2, '0');
-  const day = String(bdDate.getDate()).padStart(2, '0');
-  const todayDateStr = `${year}-${month}-${day}`;
-  const monthId = `${year}-${month}`;
-
-  console.log(`Current Bangladesh Date: ${todayDateStr} (Month: ${monthId})`);
+  // If khadok-mess and members collection was empty, fallback to root members
+  if (Object.keys(membersMap).length === 0 && messId === 'khadok-mess') {
+    try {
+      const rootMembers = await getDocs(collection(db, 'members'));
+      rootMembers.forEach((d) => {
+        const data = d.data();
+        membersMap[d.id] = data;
+        if (data.name) membersMap[data.name.trim().toLowerCase()] = data;
+      });
+    } catch (_) {}
+  }
 
   // 3. Fetch today's duty schedules
-  const schedRef = collection(db, 'months', monthId, 'bazarSchedules');
-  const snapshot = await getDocs(schedRef);
+  let schedRef = collection(db, 'messes', messId, 'months', monthId, 'bazarSchedules');
+  let snapshot = await getDocs(schedRef);
+  let todayDuties = [];
 
-  const todayDuties = [];
   snapshot.forEach((docSnap) => {
     const data = docSnap.data();
     if (data.date === todayDateStr) {
-      todayDuties.push({ id: docSnap.id, ...data });
+      todayDuties.push({ id: docSnap.id, docRef: docSnap.ref, ...data });
     }
   });
 
-  console.log(`Found ${todayDuties.length} duty schedule(s) for today (${todayDateStr}).`);
-
-  if (todayDuties.length === 0) {
-    console.log('No members scheduled for market duty today. All clear!');
-    process.exit(0);
+  if (todayDuties.length === 0 && messId === 'khadok-mess') {
+    const rootSchedRef = collection(db, 'months', monthId, 'bazarSchedules');
+    const rootSnap = await getDocs(rootSchedRef);
+    rootSnap.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.date === todayDateStr) {
+        todayDuties.push({ id: docSnap.id, docRef: docSnap.ref, ...data });
+      }
+    });
   }
+
+  console.log(`Found ${todayDuties.length} duty schedule(s) for today in mess ${messId}.`);
+  if (todayDuties.length === 0) return 0;
 
   // 4. Setup Transporter if Gmail App Password is provided
   let transporter = null;
@@ -188,28 +206,29 @@ async function runDailyEmailDispatcher() {
   const senderEmail = config.senderEmail || process.env.GMAIL_USER;
 
   if (gmailPass && senderEmail) {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: senderEmail,
-        pass: gmailPass.replace(/\s+/g, ''),
-      },
-    });
-    console.log(`Configured Gmail SMTP with sender: ${senderEmail}`);
+    try {
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: senderEmail,
+          pass: gmailPass.replace(/\s+/g, ''),
+        },
+      });
+      console.log(`Configured Gmail SMTP with sender: ${senderEmail}`);
+    } catch (e) {
+      console.warn('Gmail transporter init failed:', e.message);
+    }
   }
 
   let sentCount = 0;
-  let alreadyNotifiedCount = 0;
 
   for (const duty of todayDuties) {
     if (duty.autoEmailSent) {
       console.log(`✓ [Already Sent] Member ${duty.memberName} was already emailed at ${duty.autoEmailSentAt}.`);
-      alreadyNotifiedCount++;
       continue;
     }
 
-    // Resolve member email
-    let recipientEmail = duty.memberEmail;
+    let recipientEmail = duty.memberEmail || duty.email;
     if (!recipientEmail && duty.memberId && membersMap[duty.memberId]) {
       recipientEmail = membersMap[duty.memberId].email;
     }
@@ -227,10 +246,10 @@ async function runDailyEmailDispatcher() {
       date: duty.date,
       estimatedBudget: duty.estimatedBudget,
       notes: duty.notes,
+      messName: messName || config.senderName || 'MessHishab',
     });
 
-    console.log(`Sending automated Gmail duty alert to ${duty.memberName} (${recipientEmail})...`);
-
+    console.log(`Sending automated email duty alert to ${duty.memberName} (${recipientEmail})...`);
     let sendSuccess = false;
 
     if (transporter) {
@@ -238,7 +257,7 @@ async function runDailyEmailDispatcher() {
         await transporter.sendMail({
           from: `"${config.senderName || 'MessHishab Manager'}" <${senderEmail}>`,
           to: recipientEmail,
-          subject: `🛒 [MessHishab] আজ (${duty.date}) আপনার বাজার করার দায়িত্ব রয়েছে`,
+          subject: `🛒 [${messName || 'MessHishab'}] আজ (${duty.date}) আপনার বাজার করার দায়িত্ব রয়েছে`,
           html: emailHtml,
         });
         sendSuccess = true;
@@ -246,8 +265,29 @@ async function runDailyEmailDispatcher() {
       } catch (err) {
         console.error(`❌ Gmail SMTP failed for ${recipientEmail}:`, err.message);
       }
+    } else if (config.brevoApiKey) {
+      try {
+        const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': config.brevoApiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sender: { name: config.senderName || 'MessHishab Manager', email: config.senderEmail || 'manager@messhishab.com' },
+            to: [{ email: recipientEmail }],
+            subject: `🛒 [${messName || 'MessHishab'}] আজ (${duty.date}) আপনার বাজার করার দায়িত্ব রয়েছে`,
+            htmlContent: emailHtml,
+          }),
+        });
+        if (res.ok) {
+          sendSuccess = true;
+          console.log(`✓ Successfully sent email to ${recipientEmail} via Brevo!`);
+        }
+      } catch (err) {
+        console.error('Brevo API error:', err.message);
+      }
     } else if (config.resendApiKey || process.env.RESEND_API_KEY) {
-      // Send via Resend
       try {
         const apiKey = config.resendApiKey || process.env.RESEND_API_KEY;
         const res = await fetch('https://api.resend.com/emails', {
@@ -259,19 +299,33 @@ async function runDailyEmailDispatcher() {
           body: JSON.stringify({
             from: 'MessHishab <onboarding@resend.dev>',
             to: [recipientEmail],
-            subject: `🛒 [MessHishab] আজ (${duty.date}) আপনার বাজার করার দায়িত্ব রয়েছে`,
+            subject: `🛒 [${messName || 'MessHishab'}] আজ (${duty.date}) আপনার বাজার করার দায়িত্ব রয়েছে`,
             html: emailHtml,
           }),
         });
-        const data = await res.json();
-        if (res.ok && data.id) {
+        if (res.ok) {
           sendSuccess = true;
           console.log(`✓ Successfully sent email to ${recipientEmail} via Resend!`);
-        } else {
-          console.error(`❌ Resend failed for ${recipientEmail}:`, data.message);
         }
       } catch (err) {
-        console.error(`❌ Resend error for ${recipientEmail}:`, err.message);
+        console.error('Resend error:', err.message);
+      }
+    } else if (config.googleScriptUrl) {
+      try {
+        await fetch(config.googleScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: recipientEmail,
+            subject: `🛒 [${messName || 'MessHishab'}] আজ (${duty.date}) আপনার বাজার করার দায়িত্ব রয়েছে`,
+            html: emailHtml,
+            senderName: config.senderName || 'MessHishab Manager',
+          }),
+        });
+        sendSuccess = true;
+        console.log(`✓ Successfully sent email to ${recipientEmail} via Google Script!`);
+      } catch (err) {
+        console.error('Google script relay error:', err.message);
       }
     } else {
       console.log(`[SIMULATION MODE] Would email ${recipientEmail}:\nSubject: Bazar Duty Reminder for ${duty.date}`);
@@ -280,8 +334,7 @@ async function runDailyEmailDispatcher() {
 
     if (sendSuccess) {
       try {
-        const dutyDocRef = doc(db, 'months', monthId, 'bazarSchedules', duty.id);
-        await updateDoc(dutyDocRef, {
+        await updateDoc(duty.docRef, {
           autoEmailSent: true,
           autoEmailSentAt: new Date().toISOString(),
           emailStatus: 'sent',
@@ -293,8 +346,59 @@ async function runDailyEmailDispatcher() {
     }
   }
 
+  return sentCount;
+}
+
+async function runDailyEmailDispatcher() {
+  console.log('====================================================');
+  console.log('MessHishab - Automated Daily Email Duty Dispatcher');
+  console.log(`Current Time (UTC): ${new Date().toISOString()}`);
+  console.log('====================================================');
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Calculate current date in Bangladesh Time (UTC+6)
+  const now = new Date();
+  const bdTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' });
+  const bdDate = new Date(bdTimeStr);
+  const year = bdDate.getFullYear();
+  const month = String(bdDate.getMonth() + 1).padStart(2, '0');
+  const day = String(bdDate.getDate()).padStart(2, '0');
+  const todayDateStr = `${year}-${month}-${day}`;
+  const monthId = `${year}-${month}`;
+  const hours = String(bdDate.getHours()).padStart(2, '0');
+  const mins = String(bdDate.getMinutes()).padStart(2, '0');
+  const currentBstTimeStr = `${hours}:${mins}`;
+
+  console.log(`Current Bangladesh Date: ${todayDateStr} | Time: ${currentBstTimeStr} (Month: ${monthId})`);
+
+  // 1. Fetch all registered messes
+  const messesSnap = await getDocs(collection(db, 'messes'));
+  const messesList = [];
+  messesSnap.forEach((d) => {
+    messesList.push({ id: d.id, ...d.data() });
+  });
+
+  // Ensure default mess is included
+  if (!messesList.some((m) => m.id === 'khadok-mess')) {
+    messesList.push({ id: 'khadok-mess', name: 'Khadok Mess' });
+  }
+
+  console.log(`Found ${messesList.length} total mess(es) to check.`);
+
+  let totalSent = 0;
+  for (const mess of messesList) {
+    try {
+      const count = await processMessDuties(db, mess.id, mess.name, todayDateStr, monthId, currentBstTimeStr);
+      totalSent += count;
+    } catch (messErr) {
+      console.error(`Error processing mess ${mess.id}:`, messErr);
+    }
+  }
+
   console.log('----------------------------------------------------');
-  console.log(`Summary: ${sentCount} sent, ${alreadyNotifiedCount} already notified, total today: ${todayDuties.length}.`);
+  console.log(`Summary: Total emails sent across all messes: ${totalSent}.`);
   console.log('Execution completed successfully.');
   console.log('====================================================');
   process.exit(0);

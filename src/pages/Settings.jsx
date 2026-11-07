@@ -27,6 +27,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { useMessContext } from '../context/MessContext';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
+import { TimePicker } from '../components/common/TimePicker';
 import { memberService } from '../services/memberService';
 import { authService } from '../services/authService';
 import { messService } from '../services/messService';
@@ -88,12 +89,16 @@ export const Settings = () => {
   // Email Automation state
   const [emailConfig, setEmailConfig] = useState({
     enabled: true,
-    provider: EMAIL_PROVIDERS.GMAIL_SMTP,
+    provider: EMAIL_PROVIDERS.EMAILJS,
     senderEmail: 'messhishab@gmail.com',
     senderName: 'MessHishab Manager',
     gmailAppPassword: '',
     resendApiKey: '',
     brevoApiKey: '',
+    emailjsServiceId: '',
+    emailjsTemplateId: '',
+    emailjsPublicKey: '',
+    googleScriptUrl: '',
     testEmail: '',
     notifyTime: '07:00',
   });
@@ -639,12 +644,96 @@ export const Settings = () => {
               onChange={(e) => setEmailConfig({ ...emailConfig, provider: e.target.value })}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
             >
-              <option value={EMAIL_PROVIDERS.GMAIL_SMTP}>Gmail SMTP (Free via Google App Password - 500 emails/day)</option>
+              <option value={EMAIL_PROVIDERS.EMAILJS}>EmailJS (100% Free - Direct Gmail dispatch from browser)</option>
+              <option value={EMAIL_PROVIDERS.GOOGLE_SCRIPT}>Google Apps Script Relay (100% Free - Personal Gmail Webhook)</option>
+              <option value={EMAIL_PROVIDERS.BREVO}>Brevo API (100% Free - 300 emails/day to any inbox)</option>
               <option value={EMAIL_PROVIDERS.RESEND}>Resend API (100% Free - 3,000 emails/month)</option>
-              <option value={EMAIL_PROVIDERS.BREVO}>Brevo API (100% Free - 300 emails/day)</option>
+              <option value={EMAIL_PROVIDERS.GMAIL_SMTP}>Gmail SMTP (For 24/7 Cloud / GitHub Actions Runner with App Password)</option>
               <option value={EMAIL_PROVIDERS.SIMULATION}>Simulation Mode (Log test alerts without sending)</option>
             </select>
           </div>
+
+          {/* EmailJS Fields */}
+          {emailConfig.provider === EMAIL_PROVIDERS.EMAILJS && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Input
+                  label="EmailJS Public Key"
+                  placeholder="e.g. user_abcdef12345"
+                  value={emailConfig.emailjsPublicKey}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, emailjsPublicKey: e.target.value })}
+                  prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
+                  required
+                />
+                <Input
+                  label="EmailJS Service ID"
+                  placeholder="e.g. service_gmail"
+                  value={emailConfig.emailjsServiceId}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, emailjsServiceId: e.target.value })}
+                  prefix={<Mail className="w-4 h-4 text-slate-400" />}
+                  required
+                />
+                <Input
+                  label="EmailJS Template ID"
+                  placeholder="e.g. template_bazar_duty"
+                  value={emailConfig.emailjsTemplateId}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, emailjsTemplateId: e.target.value })}
+                  prefix={<Sparkles className="w-4 h-4 text-slate-400" />}
+                  required
+                />
+              </div>
+
+              <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-100 text-xs text-blue-950 space-y-2">
+                <p className="font-bold flex items-center gap-1.5 text-blue-900">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  How to setup EmailJS in 2 minutes (100% Free - 200 emails/month):
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-blue-800">
+                  <li>Create a free account at <strong>emailjs.com</strong>.</li>
+                  <li>Click <strong>Email Services</strong> &gt; <strong>Add Service</strong> &gt; Select <strong>Gmail</strong> and connect your Gmail account. Note down the <code>Service ID</code>.</li>
+                  <li>Click <strong>Email Templates</strong> &gt; <strong>Create New Template</strong>. In the template settings, set To Email to <code>{"{{to_email}}"}</code> and subject to <code>{"{{subject}}"}</code>. Note down the <code>Template ID</code>.</li>
+                  <li>Go to <strong>Account</strong> to find your <strong>Public Key</strong>. Paste all three above and click Save!</li>
+                </ol>
+              </div>
+            </div>
+          )}
+
+          {/* Google Apps Script Relay Fields */}
+          {emailConfig.provider === EMAIL_PROVIDERS.GOOGLE_SCRIPT && (
+            <div className="space-y-4">
+              <Input
+                label="Google Apps Script Web App URL"
+                placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
+                value={emailConfig.googleScriptUrl}
+                onChange={(e) => setEmailConfig({ ...emailConfig, googleScriptUrl: e.target.value })}
+                prefix={<ExternalLink className="w-4 h-4 text-slate-400" />}
+                helperText="100% Free - Sends real emails directly from your personal Gmail without third-party services."
+                required
+              />
+
+              <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-100 text-xs text-blue-950 space-y-2">
+                <p className="font-bold flex items-center gap-1.5 text-blue-900">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  How to setup your personal Google Apps Script Web App in 1 minute:
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-blue-800">
+                  <li>Open <strong>script.google.com</strong> with your Gmail account and click <strong>New Project</strong>.</li>
+                  <li>Replace the editor code with this 5-line script:
+                    <pre className="mt-1 p-2 bg-slate-900 text-emerald-400 rounded-lg font-mono text-[11px] overflow-x-auto">
+{`function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  GmailApp.sendEmail(data.to, data.subject, "", { htmlBody: data.html, name: data.senderName || "MessHishab" });
+  return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+}`}
+                    </pre>
+                  </li>
+                  <li>Click <strong>Deploy</strong> &gt; <strong>New Deployment</strong> &gt; Select type: <strong>Web App</strong>.</li>
+                  <li>Set <strong>Execute as: Me</strong> and <strong>Who has access: Anyone</strong>. Click <strong>Deploy</strong>.</li>
+                  <li>Copy the resulting Web App URL, paste it in the box above, and click Save!</li>
+                </ol>
+              </div>
+            </div>
+          )}
 
           {/* Gmail SMTP Fields */}
           {emailConfig.provider === EMAIL_PROVIDERS.GMAIL_SMTP && (
@@ -672,7 +761,7 @@ export const Settings = () => {
                 placeholder="abcd efgh ijkl mnop"
                 value={emailConfig.gmailAppPassword}
                 onChange={(e) => setEmailConfig({ ...emailConfig, gmailAppPassword: e.target.value })}
-                helperText="Use a Google App Password (not your regular Gmail login password)"
+                helperText="Used by the 24/7 GitHub Actions automated daily cron runner"
                 prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
               />
 
@@ -688,52 +777,72 @@ export const Settings = () => {
                   <li>Enter App Name: <strong>MessHishab</strong> and click <strong>Create</strong>.</li>
                   <li>Google will give you a 16-letter password (e.g. <code>abcd efgh ijkl mnop</code>). Paste it into the box above and save!</li>
                 </ol>
+                <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-2">
+                  💡 Note: Direct Gmail SMTP runs 24/7 on GitHub Cloud. To send instant test emails from the browser, choose EmailJS, Google Apps Script, or Brevo!
+                </p>
               </div>
             </div>
           )}
 
           {/* Resend Fields */}
           {emailConfig.provider === EMAIL_PROVIDERS.RESEND && (
-            <Input
-              label="Resend API Key"
-              placeholder="re_123456789..."
-              value={emailConfig.resendApiKey}
-              onChange={(e) => setEmailConfig({ ...emailConfig, resendApiKey: e.target.value })}
-              helperText="Free 3,000 emails/month from resend.com"
-              prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
-            />
+            <div className="space-y-4">
+              <Input
+                label="Resend API Key"
+                placeholder="re_123456789..."
+                value={emailConfig.resendApiKey}
+                onChange={(e) => setEmailConfig({ ...emailConfig, resendApiKey: e.target.value })}
+                helperText="Free 3,000 emails/month from resend.com"
+                prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
+              />
+              <Input
+                label="Sender Display Name"
+                placeholder="e.g. MessHishab Manager"
+                value={emailConfig.senderName}
+                onChange={(e) => setEmailConfig({ ...emailConfig, senderName: e.target.value })}
+                prefix={<User className="w-4 h-4 text-slate-400" />}
+              />
+            </div>
           )}
 
           {/* Brevo Fields */}
           {emailConfig.provider === EMAIL_PROVIDERS.BREVO && (
-            <Input
-              label="Brevo (Sendinblue) API Key"
-              placeholder="xkeysib-..."
-              value={emailConfig.brevoApiKey}
-              onChange={(e) => setEmailConfig({ ...emailConfig, brevoApiKey: e.target.value })}
-              helperText="Free 300 emails/day from brevo.com"
-              prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
-            />
+            <div className="space-y-4">
+              <Input
+                label="Brevo (Sendinblue) API Key"
+                placeholder="xkeysib-..."
+                value={emailConfig.brevoApiKey}
+                onChange={(e) => setEmailConfig({ ...emailConfig, brevoApiKey: e.target.value })}
+                helperText="Free 300 emails/day from brevo.com"
+                prefix={<KeyRound className="w-4 h-4 text-slate-400" />}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Sender Email Address"
+                  placeholder="e.g. yourmess@gmail.com"
+                  value={emailConfig.senderEmail}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, senderEmail: e.target.value })}
+                  prefix={<Mail className="w-4 h-4 text-slate-400" />}
+                />
+                <Input
+                  label="Sender Display Name"
+                  placeholder="e.g. MessHishab Manager"
+                  value={emailConfig.senderName}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, senderName: e.target.value })}
+                  prefix={<User className="w-4 h-4 text-slate-400" />}
+                />
+              </div>
+            </div>
           )}
 
-          {/* Timing Section */}
-          <div className="pt-2 border-t border-slate-100 space-y-2.5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <label className="text-xs font-bold text-slate-800 block">
-                  Daily Automatic Email Dispatch Time:
-                </label>
-                <p className="text-[11px] text-slate-500">
-                  The cloud runner dispatches duty emails at this time every morning.
-                </p>
-              </div>
-              <input
-                type="time"
-                value={emailConfig.notifyTime || '07:00'}
-                onChange={(e) => setEmailConfig({ ...emailConfig, notifyTime: e.target.value })}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-            </div>
+          {/* Timing Section with TimePicker */}
+          <div className="pt-2 border-t border-slate-100">
+            <TimePicker
+              value={emailConfig.notifyTime || '07:00'}
+              onChange={(newTime) => setEmailConfig({ ...emailConfig, notifyTime: newTime })}
+              label="Daily Automatic Email Dispatch Time (স্বয়ংক্রিয় ইমেইল পাঠানোর সময়):"
+              description="Select any hour and minute of the day. Duty notices will be dispatched at this chosen time."
+            />
           </div>
 
           {/* Save Button */}
@@ -781,19 +890,36 @@ export const Settings = () => {
           </div>
 
           {testEmailResult && (
-            <div
-              className={`mt-3 p-3 rounded-xl text-xs flex items-center gap-2 ${
-                testEmailResult.success
-                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                  : 'bg-rose-50 border border-rose-200 text-rose-700'
-              }`}
-            >
-              {testEmailResult.success ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              ) : (
-                <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="mt-3 space-y-2">
+              <div
+                className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  testEmailResult.success
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border border-rose-200 text-rose-700'
+                }`}
+              >
+                {testEmailResult.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{testEmailResult.message}</span>
+              </div>
+
+              {!testEmailResult.success && testEmailRecipient && (
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span>Want to test immediately without configuring an API key?</span>
+                  <a
+                    href={`mailto:${encodeURIComponent(testEmailRecipient)}?subject=${encodeURIComponent('🛒 [MessHishab] বাজার শিডিউল টেস্ট ইমেইল অ্যালার্ট')}&body=${encodeURIComponent('আসসালামু আলাইকুম!\nএটি মেস হিসাবের স্বয়ংক্রিয় বাজার শিডিউল টেস্ট অ্যালার্ট।\n\nতারিখ: আজ\nদায়িত্বপ্রাপ্ত: টেস্ট মেম্বার\nআনুমানিক বাজেট: ২৫০০ টাকা\n\nদয়া করে বাজারের প্রস্তুতি সম্পন্ন করুন।')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-xs shrink-0"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    Open Sample Email Draft in Gmail / Mail Client →
+                  </a>
+                </div>
               )}
-              <span>{testEmailResult.message}</span>
             </div>
           )}
         </div>
@@ -971,45 +1097,12 @@ export const Settings = () => {
             </h4>
 
             {/* Daily Alert Time Picker */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block">
-                    Daily Automatic Alert Time (প্রতিদিন অ্যালার্ট পাঠানোর সময়):
-                  </label>
-                  <p className="text-[11px] text-slate-500">
-                    The system runs 24/7 on GitHub Cloud and auto-sends the WhatsApp notice at this time every morning for free.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    value={waConfig.notifyTime || '07:00'}
-                    onChange={(e) => setWaConfig({ ...waConfig, notifyTime: e.target.value })}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  />
-                </div>
-              </div>
-
-              {/* Quick Preset Buttons */}
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Presets:</span>
-                {['06:30', '07:00', '07:30', '08:00', '21:00'].map((time) => (
-                  <button
-                    key={time}
-                    type="button"
-                    onClick={() => setWaConfig({ ...waConfig, notifyTime: time })}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
-                      waConfig.notifyTime === time
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {time === '21:00' ? '9:00 PM (Night)' : `${time} AM`}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <TimePicker
+              value={waConfig.notifyTime || '07:00'}
+              onChange={(newTime) => setWaConfig({ ...waConfig, notifyTime: newTime })}
+              label="Daily Automatic WhatsApp Alert Time (প্রতিদিন হোয়াটসঅ্যাপ পাঠানোর সময়):"
+              description="Select any hour and minute of the day. The automated system dispatches WhatsApp notices at this time."
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer">

@@ -10,7 +10,8 @@ import {
   Phone,
   Calendar,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Mail
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,6 +20,7 @@ export const BazarTodayAlert = ({
   tomorrowSchedules = [],
   isAdmin = false,
   onNotifyWhatsApp,
+  onSendEmail,
   onToggleStatus,
   onAssignToday,
 }) => {
@@ -93,12 +95,20 @@ export const BazarTodayAlert = ({
                           {isCompleted ? '✓ Completed' : 'Pending'}
                         </span>
                       </div>
-                      {duty.memberPhone && (
-                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          <span>{duty.memberPhone}</span>
-                        </p>
-                      )}
+                      <div className="flex flex-col gap-0.5 mt-0.5">
+                        {duty.memberPhone && (
+                          <p className="text-xs text-slate-400 flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            <span>{duty.memberPhone}</span>
+                          </p>
+                        )}
+                        {duty.memberEmail && (
+                          <p className="text-xs text-blue-300 flex items-center gap-1 font-medium">
+                            <Mail className="w-3 h-3 text-blue-400" />
+                            <span>{duty.memberEmail}</span>
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -121,21 +131,42 @@ export const BazarTodayAlert = ({
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/10">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/10 flex-wrap">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* WhatsApp Button */}
                     <button
                       type="button"
                       onClick={() => onNotifyWhatsApp(duty)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#25D366] text-slate-950 hover:bg-[#20ba5a] transition-all shadow-md shadow-[#25D366]/20"
+                      title="Send WhatsApp Reminder"
                     >
                       <MessageSquare className="w-4 h-4 fill-slate-950" />
-                      <span>WhatsApp Reminder</span>
+                      <span>WhatsApp</span>
                     </button>
 
+                    {/* Email Button */}
+                    <button
+                      type="button"
+                      onClick={() => onSendEmail && onSendEmail(duty)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-500 transition-all shadow-md shadow-blue-600/20"
+                      title={duty.memberEmail ? `Send email alert to ${duty.memberEmail}` : 'Send duty email alert'}
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>Email</span>
+                    </button>
+
+                    {/* Badges */}
                     {duty.autoNotified && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30">
                         <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        Auto-Sent
+                        WA Sent
+                      </span>
+                    )}
+
+                    {duty.autoEmailSent && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-500/30">
+                        <CheckCircle2 className="w-3 h-3 text-blue-400" />
+                        Email Sent
                       </span>
                     )}
                   </div>

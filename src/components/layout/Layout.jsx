@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNavigation } from './MobileNavigation';
 import { useMonthContext } from '../../context/MonthContext';
+import { GlobalAutoDutyDispatcher } from '../common/GlobalAutoDutyDispatcher';
 import { Lock } from 'lucide-react';
 
 export const Layout = () => {
@@ -12,6 +13,7 @@ export const Layout = () => {
 
   return (
     <div className="flex h-screen bg-slate-100/70 overflow-hidden font-sans">
+      <GlobalAutoDutyDispatcher />
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex lg:flex-shrink-0">
         <Sidebar />

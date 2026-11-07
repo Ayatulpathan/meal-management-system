@@ -14,7 +14,9 @@ import {
   Search,
   Copy,
   Check,
-  Plus
+  Plus,
+  Mail,
+  Send
 } from 'lucide-react';
 
 export const BazarScheduleTable = ({
@@ -28,6 +30,7 @@ export const BazarScheduleTable = ({
   onToggleStatus,
   onNotifyWhatsApp,
   onCopyWhatsApp,
+  onSendEmail,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedId, setCopiedId] = useState(null);
@@ -100,7 +103,7 @@ export const BazarScheduleTable = ({
                 <th className="py-3 px-4">Notes / Items</th>
                 <th className="py-3 px-4 text-right">Budget</th>
                 <th className="py-3 px-4 text-center">Duty Status</th>
-                <th className="py-3 px-4 text-center">WhatsApp Alert</th>
+                <th className="py-3 px-4 text-center">Alerts & Reminders</th>
                 {isAdmin && !isClosed && <th className="py-3 px-4 text-center">Actions</th>}
               </tr>
             </thead>
@@ -138,11 +141,18 @@ export const BazarScheduleTable = ({
                         </div>
                         <div>
                           <span className="font-bold text-slate-900 block">{item.memberName}</span>
-                          {item.memberPhone && (
-                            <span className="text-[11px] text-slate-400 font-normal flex items-center gap-1">
-                              <Phone className="w-3 h-3" /> {item.memberPhone}
-                            </span>
-                          )}
+                          <div className="flex flex-col gap-0.5">
+                            {item.memberPhone && (
+                              <span className="text-[11px] text-slate-400 font-normal flex items-center gap-1">
+                                <Phone className="w-3 h-3" /> {item.memberPhone}
+                              </span>
+                            )}
+                            {item.memberEmail && (
+                              <span className="text-[11px] text-blue-600 font-medium flex items-center gap-1 truncate max-w-[180px]" title={item.memberEmail}>
+                                <Mail className="w-3 h-3 text-blue-500 shrink-0" /> {item.memberEmail}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -188,20 +198,33 @@ export const BazarScheduleTable = ({
                       </button>
                     </td>
 
-                    {/* WhatsApp Notification Action */}
+                    {/* Notification Alerts (WhatsApp & Email) */}
                     <td className="py-3 px-4 text-center">
-                      <div className="flex flex-col items-center justify-center gap-1">
-                        <div className="flex items-center justify-center gap-1.5">
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
+                          {/* WhatsApp Button */}
                           <button
                             type="button"
                             onClick={() => onNotifyWhatsApp(item)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366] hover:text-white transition-all shadow-2xs border border-[#25D366]/30 group"
-                            title="Send pre-filled message via WhatsApp"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366] hover:text-white transition-all border border-[#25D366]/30"
+                            title="Send WhatsApp message"
                           >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            <span>WhatsApp</span>
+                            <MessageSquare className="w-3 h-3" />
+                            <span>WA</span>
                           </button>
 
+                          {/* Email Dispatch Button */}
+                          <button
+                            type="button"
+                            onClick={() => onSendEmail && onSendEmail(item)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white transition-all border border-blue-200"
+                            title={item.memberEmail ? `Dispatch duty alert to ${item.memberEmail}` : 'Dispatch duty alert email'}
+                          >
+                            <Mail className="w-3 h-3" />
+                            <span>Email</span>
+                          </button>
+
+                          {/* Copy Button */}
                           <button
                             type="button"
                             onClick={() => handleCopy(item)}
@@ -216,15 +239,27 @@ export const BazarScheduleTable = ({
                           </button>
                         </div>
 
-                        {item.autoNotified && (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200"
-                            title={item.autoNotifiedAt ? `Auto-notified at ${new Date(item.autoNotifiedAt).toLocaleTimeString()}` : 'Auto-notified'}
-                          >
-                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                            Auto-Sent
-                          </span>
-                        )}
+                        {/* Status Badges */}
+                        <div className="flex flex-wrap items-center justify-center gap-1">
+                          {item.autoNotified && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200"
+                              title={item.autoNotifiedAt ? `Auto-notified at ${new Date(item.autoNotifiedAt).toLocaleTimeString()}` : 'WhatsApp Sent'}
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                              WA Sent
+                            </span>
+                          )}
+                          {item.autoEmailSent && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-full border border-blue-200"
+                              title={item.autoEmailSentAt ? `Emailed at ${new Date(item.autoEmailSentAt).toLocaleTimeString()}` : 'Email Sent'}
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5 text-blue-600" />
+                              Email Sent
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
 

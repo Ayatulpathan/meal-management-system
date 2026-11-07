@@ -108,6 +108,24 @@ function generateDutyEmailHtml({ memberName, date, estimatedBudget, notes, messN
   `.trim();
 }
 
+function generateDutyEmailText({ memberName, date, estimatedBudget, notes, messName = 'MessHishab' }) {
+  const notesText = notes ? `\n📝 বাজারের ফর্দ:\n${notes}\n` : '';
+  const budget = estimatedBudget > 0 ? `৳${Number(estimatedBudget).toLocaleString('en-IN')}` : 'প্রয়োজন অনুযায়ী';
+  return `আসসালামু আলাইকুম ${memberName},
+
+আপনাকে জানানো হচ্ছে যে, মেসের শিডিউল অনুযায়ী আজ ${date} তারিখে আপনার বাজার করার দায়িত্ব রয়েছে।
+
+📅 তারিখ: ${date}
+👤 দায়িত্বপ্রাপ্ত: ${memberName}
+💵 আনুমানিক বাজেট: ${budget}${notesText}
+
+অনুগ্রহ করে মেসের দায়িত্বপ্রাপ্তদের সাথে যোগাযোগ করে বাজারের ফর্দ ও প্রয়োজনীয় টাকা সংগ্রহ করে নিবেন।
+অনলাইনে সম্পূর্ণ শিডিউল দেখুন: https://khadok-meal.web.app/bazar-schedule
+
+ধন্যবাদ,
+${messName}`.trim();
+}
+
 async function processMessDuties(db, messId, messName, todayDateStr, monthId, currentBstTimeStr) {
   console.log(`\n--- Processing Mess: [${messId}] ${messName || ''} ---`);
 
@@ -249,6 +267,14 @@ async function processMessDuties(db, messId, messName, todayDateStr, monthId, cu
       messName: messName || config.senderName || 'MessHishab',
     });
 
+    const emailText = generateDutyEmailText({
+      memberName: duty.memberName,
+      date: duty.date,
+      estimatedBudget: duty.estimatedBudget,
+      notes: duty.notes,
+      messName: messName || config.senderName || 'MessHishab',
+    });
+
     console.log(`Sending automated email duty alert to ${duty.memberName} (${recipientEmail})...`);
     let sendSuccess = false;
 
@@ -259,6 +285,7 @@ async function processMessDuties(db, messId, messName, todayDateStr, monthId, cu
           to: recipientEmail,
           subject: `🛒 [${messName || 'MessHishab'}] আজ (${duty.date}) আপনার বাজার করার দায়িত্ব রয়েছে`,
           html: emailHtml,
+          text: emailText,
         });
         sendSuccess = true;
         console.log(`✓ Successfully sent email to ${recipientEmail} via Gmail SMTP!`);

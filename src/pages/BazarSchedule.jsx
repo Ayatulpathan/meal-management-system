@@ -41,7 +41,28 @@ export const BazarSchedule = () => {
     autoRotate,
     notifyOnWhatsApp,
     copyWhatsAppMessage,
+    sendManualEmail,
   } = useBazarSchedule();
+
+  const [emailAlertFeedback, setEmailAlertFeedback] = useState(null);
+
+  const handleSendEmailAlert = async (schedule) => {
+    setEmailAlertFeedback(null);
+    const res = await sendManualEmail(schedule);
+    if (res?.success) {
+      setEmailAlertFeedback({
+        success: true,
+        message: `✓ Duty email alert sent successfully to ${schedule.memberName}!`,
+      });
+      setTimeout(() => setEmailAlertFeedback(null), 5000);
+    } else {
+      setEmailAlertFeedback({
+        success: false,
+        message: `Failed to dispatch email: ${res?.error || 'Check email settings'}`,
+      });
+      setTimeout(() => setEmailAlertFeedback(null), 7000);
+    }
+  };
 
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -159,7 +180,21 @@ export const BazarSchedule = () => {
       {autoDispatchStatus && (
         <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2 shadow-xs animate-fadeIn">
           <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span><strong>Automatic WhatsApp Alert:</strong> {autoDispatchStatus}</span>
+          <span><strong>Automatic Duty Alert:</strong> {autoDispatchStatus}</span>
+        </div>
+      )}
+
+      {/* Manual Email Feedback Alert */}
+      {emailAlertFeedback && (
+        <div
+          className={`p-3.5 rounded-2xl text-xs flex items-center gap-2 shadow-xs animate-fadeIn ${
+            emailAlertFeedback.success
+              ? 'bg-blue-50 border border-blue-200 text-blue-900'
+              : 'bg-rose-50 border border-rose-200 text-rose-800'
+          }`}
+        >
+          <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>{emailAlertFeedback.message}</span>
         </div>
       )}
 
@@ -169,6 +204,7 @@ export const BazarSchedule = () => {
         tomorrowSchedules={tomorrowSchedules}
         isAdmin={isAdmin && !isClosed}
         onNotifyWhatsApp={notifyOnWhatsApp}
+        onSendEmail={handleSendEmailAlert}
         onToggleStatus={toggleStatus}
         onAssignToday={() => handleOpenAdd(new Date().toISOString().split('T')[0])}
       />
@@ -208,7 +244,7 @@ export const BazarSchedule = () => {
         />
       </div>
 
-      {/* Schedule Table View with WhatsApp Actions */}
+      {/* Schedule Table View with WhatsApp & Email Actions */}
       <BazarScheduleTable
         schedules={schedules}
         todayDate={new Date().toISOString().split('T')[0]}
@@ -220,6 +256,7 @@ export const BazarSchedule = () => {
         onToggleStatus={toggleStatus}
         onNotifyWhatsApp={notifyOnWhatsApp}
         onCopyWhatsApp={copyWhatsAppMessage}
+        onSendEmail={handleSendEmailAlert}
       />
 
       {/* Modals & Dialogs */}

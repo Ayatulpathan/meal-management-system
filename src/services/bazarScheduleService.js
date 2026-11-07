@@ -279,6 +279,7 @@ export const bazarScheduleService = {
           memberId: member.id,
           memberName: member.name,
           memberPhone: member.phone || '',
+          memberEmail: member.email || '',
           notes: 'Regular scheduled mess bazar',
           status: BAZAR_DUTY_STATUS.PENDING,
           assignedBy,

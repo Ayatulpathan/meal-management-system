@@ -5,7 +5,7 @@ import { Select } from '../common/Select';
 import { Button } from '../common/Button';
 import { CURRENCY_SYMBOL } from '../../utils/currencyUtils';
 import { getTodayDateString } from '../../utils/dateUtils';
-import { MessageSquare, Phone, Calendar, User, FileText, Send } from 'lucide-react';
+import { MessageSquare, Phone, Calendar, User, FileText, Send, Mail } from 'lucide-react';
 
 export const BazarScheduleModal = ({
   isOpen,
@@ -21,6 +21,7 @@ export const BazarScheduleModal = ({
     memberId: '',
     memberName: '',
     memberPhone: '',
+    memberEmail: '',
     date: getTodayDateString(),
     notes: '',
     estimatedBudget: '',
@@ -34,6 +35,7 @@ export const BazarScheduleModal = ({
         memberId: initialData.memberId || '',
         memberName: initialData.memberName || '',
         memberPhone: initialData.memberPhone || '',
+        memberEmail: initialData.memberEmail || '',
         date: initialData.date || getTodayDateString(),
         notes: initialData.notes || '',
         estimatedBudget: initialData.estimatedBudget ? String(initialData.estimatedBudget) : '',
@@ -45,6 +47,7 @@ export const BazarScheduleModal = ({
         memberId: defaultMember?.id || '',
         memberName: defaultMember?.name || '',
         memberPhone: defaultMember?.phone || '',
+        memberEmail: defaultMember?.email || '',
         date: getTodayDateString(),
         notes: '',
         estimatedBudget: '',
@@ -65,6 +68,7 @@ export const BazarScheduleModal = ({
         if (found) {
           updated.memberName = found.name;
           updated.memberPhone = found.phone || '';
+          updated.memberEmail = found.email || '';
         }
       }
       return updated;
@@ -91,6 +95,7 @@ export const BazarScheduleModal = ({
       ...formData,
       memberName: member ? member.name : formData.memberName,
       memberPhone: formData.memberPhone || member?.phone || '',
+      memberEmail: formData.memberEmail || member?.email || '',
       estimatedBudget: Number(formData.estimatedBudget) || 0,
       assignedBy: currentUser?.displayName || 'Administrator',
     };
@@ -107,7 +112,7 @@ export const BazarScheduleModal = ({
 
   const memberOptions = activeMembers.map((m) => ({
     value: m.id,
-    label: `${m.name}${m.phone ? ` (${m.phone})` : ''}`,
+    label: `${m.name}${m.phone ? ` (${m.phone})` : ''}${m.email ? ` • ${m.email}` : ''}`,
   }));
 
   return (
@@ -118,17 +123,17 @@ export const BazarScheduleModal = ({
       subtitle="Schedule which mess member goes for grocery shopping on a specific date"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Select
-          label="Select Member on Duty"
-          name="memberId"
-          value={formData.memberId}
-          onChange={handleChange}
-          options={memberOptions}
-          required
-          error={errors.memberId}
-        />
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Select
+            label="Select Member on Duty"
+            name="memberId"
+            value={formData.memberId}
+            onChange={handleChange}
+            options={memberOptions}
+            required
+            error={errors.memberId}
+          />
+
           <Input
             label="Duty Date"
             name="date"
@@ -138,7 +143,9 @@ export const BazarScheduleModal = ({
             required
             error={errors.date}
           />
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Phone Number (WhatsApp)"
             name="memberPhone"
@@ -146,7 +153,18 @@ export const BazarScheduleModal = ({
             onChange={handleChange}
             placeholder="017XXXXXXXX"
             prefix={<Phone className="w-4 h-4 text-slate-400" />}
-            helperText="Used to send 1-click WhatsApp message"
+            helperText="Used to send WhatsApp duty alert"
+          />
+
+          <Input
+            label="Email Address (Gmail Alert)"
+            name="memberEmail"
+            type="email"
+            value={formData.memberEmail}
+            onChange={handleChange}
+            placeholder="member@gmail.com"
+            prefix={<Mail className="w-4 h-4 text-slate-400" />}
+            helperText="Used for automated email duty alert"
           />
         </div>
 

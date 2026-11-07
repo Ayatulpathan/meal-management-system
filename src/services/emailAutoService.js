@@ -8,18 +8,22 @@ import {
   db,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   isFirebaseConfigured
 } from './firebase';
 import {
   getMessDoc,
   getRootDoc,
+  getMessCollection,
+  getRootCollection,
   setMessDocData,
   updateMessDocData
 } from './dbPaths';
 import { formatDateDisplay, getTodayDateString } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/currencyUtils';
 import { DEFAULT_MESS_ID, getActiveMessId } from '../models/messModel';
+import { sanitizeBazarSchedule } from '../models/bazarScheduleModel';
 
 const CONFIG_STORAGE_KEY = 'mms_email_config';
 
@@ -48,6 +52,37 @@ const DEFAULT_CONFIG = {
   notifyTime: '07:00',
   sendAdvanceNoticeEveningBefore: false,
   lastUpdated: null,
+};
+
+/**
+ * Generate clean, human-readable plain text email (No raw HTML tags)
+ */
+export const generateDutyEmailText = ({
+  memberName = 'সহযোদ্ধা',
+  date = '',
+  estimatedBudget = 0,
+  notes = '',
+  messName = 'MessHishab',
+}) => {
+  const formattedDate = date ? formatDateDisplay(date) : 'আজকে';
+  const formattedBudget = estimatedBudget > 0 ? formatCurrency(estimatedBudget) : 'প্রয়োজন অনুযায়ী';
+  const notesText = notes ? `\n📝 বাজারের ফর্দ / নোট:\n${notes}\n` : '';
+
+  return `আসসালামু আলাইকুম ${memberName},
+
+আপনাকে জানানো হচ্ছে যে, মেসের শিডিউল অনুযায়ী ${formattedDate} তারিখে আপনার বাজার করার দায়িত্ব রয়েছে।
+
+📅 তারিখ: ${formattedDate}
+👤 দায়িত্বপ্রাপ্ত: ${memberName}
+💵 আনুমানিক বাজেট: ${formattedBudget}${notesText}
+
+অনুগ্রহ করে মেসের দায়িত্বপ্রাপ্তদের সাথে যোগাযোগ করে বাজারের ফর্দ ও প্রয়োজনীয় টাকা সংগ্রহ করে নিবেন। বাজার সম্পন্ন হওয়ার পর মেস ম্যানেজারে খরচের ভাউচার যুক্ত করার অনুরোধ করা হলো।
+
+অনলাইনে সম্পূর্ণ শিডিউল দেখতে ভিজিট করুন:
+https://khadok-meal.web.app/bazar-schedule
+
+ধন্যবাদ,
+${messName}`.trim();
 };
 
 /**
@@ -251,9 +286,10 @@ export const emailAutoService = {
   },
 
   /**
-   * Send email using EmailJS REST API (Free & Works natively in browser without backend)
+   * Send email using EmailJS REST API
+   * Pass BOTH clean readable text for {{message}} and HTML for {{{html_message}}}
    */
-  async sendViaEmailJS({ to, subject, html, memberName = 'সহযোদ্ধা', config }) {
+  async sendViaEmailJS({ to, subject, html, text, memberName = 'সহযোদ্ধা', notes = '', budget = 0, date = '', config }) {
     const serviceId = config.emailjsServiceId;
     const templateId = config.emailjsTemplateId;
     const publicKey = config.emailjsPublicKey;
@@ -264,6 +300,16 @@ export const emailAutoService = {
         error: 'Missing EmailJS credentials. Please enter your Public Key, Service ID, and Template ID in Settings.',
       };
     }
+
+    const formattedDate = date ? formatDateDisplay(date) : 'আজকে';
+    const formattedBudget = budget > 0 ? formatCurrency(budget) : 'প্রয়োজন অনুযায়ী';
+    const plainText = text || generateDutyEmailText({
+      memberName,
+      date,
+      estimatedBudget: budget,
+      notes,
+      messName: config.senderName || 'MessHishab',
+    });
 
     try {
       const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
@@ -279,9 +325,14 @@ export const emailAutoService = {
             to_email: to,
             recipient_email: to,
             to_name: memberName,
+            member_name: memberName,
             subject,
-            message: html,
-            html_message: html,
+            message: plainText, // Human-readable text for standard {{message}} templates (No raw HTML)
+            notes: notes || 'কোন বিশেষ নোট নেই',
+            duty_date: formattedDate,
+            budget: formattedBudget,
+            html_message: html, // Rich HTML for templates with {{{html_message}}}
+            content_html: html,
             mess_name: config.senderName || 'MessHishab',
           },
         }),
@@ -303,7 +354,7 @@ export const emailAutoService = {
   /**
    * Send email using Google Apps Script Web App Relay (100% Free - Sends from user's Gmail)
    */
-  async sendViaGoogleScript({ to, subject, html, config }) {
+  async sendViaGoogleScript({ to, subject, html, text, config }) {
     const scriptUrl = config.googleScriptUrl;
     if (!scriptUrl || !scriptUrl.startsWith('http')) {
       return {
@@ -323,6 +374,7 @@ export const emailAutoService = {
           to,
           subject,
           html,
+          body: text || '',
           senderName: config.senderName || 'MessHishab Manager',
         }),
       });
@@ -340,7 +392,7 @@ export const emailAutoService = {
   /**
    * Send email using Brevo (Sendinblue) API (Free - 300 emails/day)
    */
-  async sendViaBrevo({ to, subject, html, config }) {
+  async sendViaBrevo({ to, subject, html, text, config }) {
     const apiKey = config.brevoApiKey;
     if (!apiKey) {
       return { success: false, error: 'Brevo API Key is missing. Please enter it in Settings.' };
@@ -361,6 +413,7 @@ export const emailAutoService = {
           to: [{ email: to }],
           subject,
           htmlContent: html,
+          textContent: text || '',
         }),
       });
 
@@ -380,7 +433,7 @@ export const emailAutoService = {
   /**
    * Send email using Resend API (Free - 3,000 emails/month)
    */
-  async sendViaResend({ to, subject, html, config }) {
+  async sendViaResend({ to, subject, html, text, config }) {
     const apiKey = config.resendApiKey;
     if (!apiKey) {
       return { success: false, error: 'Resend API Key is missing. Please enter it in Settings.' };
@@ -398,6 +451,7 @@ export const emailAutoService = {
           to: [to],
           subject,
           html,
+          text: text || '',
         }),
       });
 
@@ -417,50 +471,78 @@ export const emailAutoService = {
   /**
    * Send an automated email through configured provider
    */
-  async sendEmail({ to, subject, html, memberName, config = null }) {
+  async sendEmail({ to, subject, html, text, memberName, notes = '', budget = 0, date = '', config = null }) {
     const activeConfig = config || (await this.getConfig());
 
     if (!to || !to.includes('@')) {
       return { success: false, error: 'Recipient email address is invalid.' };
     }
 
+    const plainText = text || generateDutyEmailText({
+      memberName: memberName || 'সহযোদ্ধা',
+      date: date || getTodayDateString(),
+      estimatedBudget: budget,
+      notes,
+      messName: activeConfig.senderName || 'MessHishab',
+    });
+
     const { provider } = activeConfig;
 
     try {
       if (provider === EMAIL_PROVIDERS.SIMULATION) {
-        console.log(`[SIMULATED EMAIL SENT] To: ${to}\nSubject: ${subject}`);
+        console.log(`[SIMULATED EMAIL SENT] To: ${to}\nSubject: ${subject}\nBody:\n${plainText}`);
         return { success: true, messageId: `sim_email_${Date.now()}` };
       }
 
       if (provider === EMAIL_PROVIDERS.EMAILJS) {
-        return await this.sendViaEmailJS({ to, subject, html, memberName, config: activeConfig });
+        return await this.sendViaEmailJS({
+          to,
+          subject,
+          html,
+          text: plainText,
+          memberName,
+          notes,
+          budget,
+          date,
+          config: activeConfig,
+        });
       }
 
       if (provider === EMAIL_PROVIDERS.GOOGLE_SCRIPT) {
-        return await this.sendViaGoogleScript({ to, subject, html, config: activeConfig });
+        return await this.sendViaGoogleScript({ to, subject, html, text: plainText, config: activeConfig });
       }
 
       if (provider === EMAIL_PROVIDERS.BREVO) {
-        return await this.sendViaBrevo({ to, subject, html, config: activeConfig });
+        return await this.sendViaBrevo({ to, subject, html, text: plainText, config: activeConfig });
       }
 
       if (provider === EMAIL_PROVIDERS.RESEND) {
-        return await this.sendViaResend({ to, subject, html, config: activeConfig });
+        return await this.sendViaResend({ to, subject, html, text: plainText, config: activeConfig });
       }
 
       if (provider === EMAIL_PROVIDERS.GMAIL_SMTP) {
         // If an API key or webhook is configured alongside, use it for browser dispatch
         if (activeConfig.emailjsPublicKey && activeConfig.emailjsServiceId) {
-          return await this.sendViaEmailJS({ to, subject, html, memberName, config: activeConfig });
+          return await this.sendViaEmailJS({
+            to,
+            subject,
+            html,
+            text: plainText,
+            memberName,
+            notes,
+            budget,
+            date,
+            config: activeConfig,
+          });
         }
         if (activeConfig.googleScriptUrl) {
-          return await this.sendViaGoogleScript({ to, subject, html, config: activeConfig });
+          return await this.sendViaGoogleScript({ to, subject, html, text: plainText, config: activeConfig });
         }
         if (activeConfig.brevoApiKey) {
-          return await this.sendViaBrevo({ to, subject, html, config: activeConfig });
+          return await this.sendViaBrevo({ to, subject, html, text: plainText, config: activeConfig });
         }
         if (activeConfig.resendApiKey) {
-          return await this.sendViaResend({ to, subject, html, config: activeConfig });
+          return await this.sendViaResend({ to, subject, html, text: plainText, config: activeConfig });
         }
 
         // Validate that sender credentials exist
@@ -471,7 +553,6 @@ export const emailAutoService = {
           };
         }
 
-        // Honest error message: Browser cannot open raw TCP port 465 to Gmail SMTP
         return {
           success: false,
           error:
@@ -497,9 +578,18 @@ export const emailAutoService = {
       return { success: false, error: 'Please enter a valid recipient email address.' };
     }
 
+    const todayDate = getTodayDateString();
     const testHtml = generateDutyEmailHtml({
       memberName: 'টেস্ট মেম্বার (Test Member)',
-      date: getTodayDateString(),
+      date: todayDate,
+      estimatedBudget: 2500,
+      notes: 'মাছ, শাকসবজি, ডিম ও মশলাপাতি',
+      messName: config.senderName || 'MessHishab',
+    });
+
+    const testText = generateDutyEmailText({
+      memberName: 'টেস্ট মেম্বার (Test Member)',
+      date: todayDate,
       estimatedBudget: 2500,
       notes: 'মাছ, শাকসবজি, ডিম ও মশলাপাতি',
       messName: config.senderName || 'MessHishab',
@@ -509,13 +599,18 @@ export const emailAutoService = {
       to: targetEmail,
       subject: `🛒 [${config.senderName || 'MessHishab'}] বাজার শিডিউল টেস্ট ইমেইল অ্যালার্ট (Test Alert)`,
       html: testHtml,
+      text: testText,
       memberName: 'টেস্ট মেম্বার',
+      notes: 'মাছ, শাকসবজি, ডিম ও মশলাপাতি',
+      budget: 2500,
+      date: todayDate,
       config,
     });
   },
 
   /**
    * Check and auto-dispatch today's duty email alert if reached scheduled time
+   * Robust: resolves recipient email from schedule OR members collection so no member is missed!
    * @param {Array} schedules
    * @param {string} activeMonthId
    * @param {string} messId
@@ -542,18 +637,65 @@ export const emailAutoService = {
       }
     }
 
+    // 1. Fetch today's duties if not passed in
     const todayStr = getTodayDateString();
-    const todayDuties = schedules.filter(
-      (s) => s.date === todayStr && !s.autoEmailSent && (s.memberEmail || s.email)
-    );
+    let dutyList = schedules;
+    if (!dutyList || dutyList.length === 0) {
+      try {
+        if (isFirebaseConfigured()) {
+          const schedSnap = await getDocs(getMessCollection(targetMessId, 'months', activeMonthId, 'bazarSchedules'));
+          dutyList = schedSnap.docs.map((d) => sanitizeBazarSchedule(d.id, d.data()));
+        }
+      } catch (_) {}
+    }
 
-    if (todayDuties.length === 0) {
+    // 2. Fetch members map to resolve member emails if missing in schedule
+    const membersMap = {};
+    if (isFirebaseConfigured()) {
+      try {
+        const memSnap = await getDocs(getMessCollection(targetMessId, 'members'));
+        memSnap.forEach((d) => {
+          const data = d.data();
+          membersMap[d.id] = data;
+          if (data.name) membersMap[data.name.trim().toLowerCase()] = data;
+        });
+
+        if (Object.keys(membersMap).length === 0 && targetMessId === DEFAULT_MESS_ID) {
+          const rootMemSnap = await getDocs(getRootCollection('members'));
+          rootMemSnap.forEach((d) => {
+            const data = d.data();
+            membersMap[d.id] = data;
+            if (data.name) membersMap[data.name.trim().toLowerCase()] = data;
+          });
+        }
+      } catch (e) {
+        console.warn('Could not fetch members map:', e);
+      }
+    }
+
+    // Filter today's duties that haven't received an automated email yet
+    const pendingDuties = (dutyList || []).filter((s) => s.date === todayStr && !s.autoEmailSent);
+
+    if (pendingDuties.length === 0) {
       return { dispatched: 0, message: 'No pending email duties for today.' };
     }
 
     const results = [];
-    for (const duty of todayDuties) {
-      const recipientEmail = duty.memberEmail || duty.email;
+    for (const duty of pendingDuties) {
+      // Robust resolution: duty.memberEmail -> membersMap[memberId] -> membersMap[memberName]
+      let recipientEmail = duty.memberEmail || duty.email;
+      if (!recipientEmail && duty.memberId && membersMap[duty.memberId]) {
+        recipientEmail = membersMap[duty.memberId].email;
+      }
+      if (!recipientEmail && duty.memberName && membersMap[duty.memberName.trim().toLowerCase()]) {
+        recipientEmail = membersMap[duty.memberName.trim().toLowerCase()].email;
+      }
+
+      if (!recipientEmail || !recipientEmail.includes('@')) {
+        console.warn(`[Auto-Email] Skipping member ${duty.memberName}: no valid email address found.`);
+        continue;
+      }
+
       const emailHtml = generateDutyEmailHtml({
         memberName: duty.memberName || 'সহযোদ্ধা',
         date: duty.date,
@@ -562,21 +704,37 @@ export const emailAutoService = {
         messName: config.senderName || 'MessHishab',
       });
 
+      const emailText = generateDutyEmailText({
+        memberName: duty.memberName || 'সহযোদ্ধা',
+        date: duty.date,
+        estimatedBudget: duty.estimatedBudget || 0,
+        notes: duty.notes || '',
+        messName: config.senderName || 'MessHishab',
+      });
+
+      console.log(`[Auto-Email] Dispatching duty email alert to ${duty.memberName} (${recipientEmail})...`);
+
       const res = await this.sendEmail({
         to: recipientEmail,
         subject: `🛒 [${config.senderName || 'MessHishab'}] আজ (${duty.date}) আপনার বাজার করার দায়িত্ব রয়েছে`,
         html: emailHtml,
+        text: emailText,
         memberName: duty.memberName || 'সহযোদ্ধা',
+        notes: duty.notes || '',
+        budget: duty.estimatedBudget || 0,
+        date: duty.date,
         config,
       });
 
       if (res.success && isFirebaseConfigured()) {
         try {
           await updateMessDocData(targetMessId, ['months', activeMonthId, 'bazarSchedules', duty.id], {
+            memberEmail: recipientEmail,
             autoEmailSent: true,
             autoEmailSentAt: new Date().toISOString(),
             emailStatus: 'sent',
           });
+          console.log(`✓ [Auto-Email] Successfully updated schedule ${duty.id} as sent!`);
         } catch (dbErr) {
           console.warn('Failed to update duty email status:', dbErr);
         }

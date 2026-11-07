@@ -691,7 +691,13 @@ export const Settings = () => {
                 <ol className="list-decimal list-inside space-y-1 text-blue-800">
                   <li>Create a free account at <strong>emailjs.com</strong>.</li>
                   <li>Click <strong>Email Services</strong> &gt; <strong>Add Service</strong> &gt; Select <strong>Gmail</strong> and connect your Gmail account. Note down the <code>Service ID</code>.</li>
-                  <li>Click <strong>Email Templates</strong> &gt; <strong>Create New Template</strong>. In the template settings, set To Email to <code>{"{{to_email}}"}</code> and subject to <code>{"{{subject}}"}</code>. Note down the <code>Template ID</code>.</li>
+                  <li>Click <strong>Email Templates</strong> &gt; <strong>Create New Template</strong>. In template settings:
+                    <ul className="list-disc list-inside ml-4 mt-1 text-slate-700 space-y-0.5">
+                      <li>Set <strong>To Email</strong>: <code>{"{{to_email}}"}</code></li>
+                      <li>Set <strong>Subject</strong>: <code>{"{{subject}}"}</code></li>
+                      <li>In the <strong>Content</strong> body: Simply put <code>{"{{message}}"}</code> to receive clean, formatted text! (Or put <code>{"{{{html_message}}}"}</code> with 3 curly braces for rich styled HTML).</li>
+                    </ul>
+                  </li>
                   <li>Go to <strong>Account</strong> to find your <strong>Public Key</strong>. Paste all three above and click Save!</li>
                 </ol>
               </div>

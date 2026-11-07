@@ -212,6 +212,7 @@ export const Settings = () => {
         testEmail: testEmailRecipient,
       }, currentMessId);
       if (res.success) {
+        emailAutoService.clearDispatchedCache();
         setEmailSaveSuccess('Automated Email settings updated and saved successfully!');
         setTimeout(() => setEmailSaveSuccess(''), 4000);
       } else {

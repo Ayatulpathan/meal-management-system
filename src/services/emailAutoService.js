@@ -692,11 +692,7 @@ export const emailAutoService = {
       const cacheKey = `${duty.id}_${todayStr}`;
       // 1. Check in-memory session cache
       if (DISPATCHED_MEMORY_CACHE.has(cacheKey)) return true;
-      // 2. Check localStorage persistent cache
-      try {
-        if (localStorage.getItem(`mms_dispatched_${duty.id}`) === todayStr) return true;
-      } catch (_) {}
-      // 3. Check Firestore document autoEmailSent flag
+           // 3. Check Firestore document autoEmailSent flag
       if (duty.autoEmailSent) return true;
       return false;
     };
@@ -816,5 +812,8 @@ export const emailAutoService = {
       console.error('Error resetting duty email status:', err);
       return { success: false, error: err.message };
     }
+  },
+  clearDispatchedCache() {
+    DISPATCHED_MEMORY_CACHE.clear();
   },
 };
